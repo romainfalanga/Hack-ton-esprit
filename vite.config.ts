@@ -1,9 +1,24 @@
 import { defineConfig } from 'vite'
-import pages from '@hono/vite-cloudflare-pages'
+import path from 'path'
 
 export default defineConfig({
-  plugins: [pages()],
   build: {
-    outDir: 'dist'
-  }
+    outDir: 'dist',
+    emptyOutDir: true,
+    lib: {
+      entry: path.resolve(__dirname, 'src/index.tsx'),
+      formats: ['es'],
+      fileName: () => '_worker.js',
+    },
+    rollupOptions: {
+      external: [],
+    },
+    minify: 'esbuild',
+    sourcemap: false,
+  },
+  resolve: {
+    alias: {
+      '~': path.resolve(__dirname, 'src'),
+    },
+  },
 })
