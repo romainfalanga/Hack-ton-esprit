@@ -1,13 +1,13 @@
 {
-  "name": "decode-ton-esprit",
+  "name": "hack-ton-esprit",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "wrangler pages dev dist --d1=decode-ton-esprit-db --local",
-    "dev:sandbox": "wrangler pages dev dist --d1=decode-ton-esprit-db --local --ip 0.0.0.0 --port 3000",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name decode-ton-esprit",
-    "db:migrate:local": "wrangler d1 migrations apply decode-ton-esprit-db --local",
+    "preview": "wrangler pages dev dist --d1=hack-ton-esprit-db --local",
+    "dev:sandbox": "wrangler pages dev dist --d1=hack-ton-esprit-db --local --ip 0.0.0.0 --port 3000",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name hack-ton-esprit",
+    "db:migrate:local": "wrangler d1 migrations apply hack-ton-esprit-db --local",
     "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },

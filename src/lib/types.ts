@@ -1,5 +1,5 @@
 // ============================================
-// DÉCODE TON ESPRIT — TYPES
+// HACK TON ESPRIT — TYPES
 // ============================================
 
 export type Bindings = {

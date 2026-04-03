@@ -19,8 +19,8 @@ export async function callAI(apiKey: string, request: AIRequest): Promise<string
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://decode-ton-esprit.pages.dev',
-      'X-Title': 'Décode Ton Esprit'
+      'HTTP-Referer': 'https://hack-ton-esprit.pages.dev',
+      'X-Title': 'Hack Ton Esprit'
     },
     body: JSON.stringify({
       model,
@@ -114,7 +114,7 @@ Ne retourne que les patterns avec une confiance >= 0.6. Si pas assez de données
 
 // Generate personalized ritual prompts
 export async function generateRitualPrompts(apiKey: string, ritualKey: string, userPatterns: any[], recentData: any): Promise<string[]> {
-  const prompt = `Tu es un guide bienveillant dans un jeu d'introspection appelé "Décode Ton Esprit".
+  const prompt = `Tu es un guide bienveillant dans un jeu d'introspection appelé "Hack Ton Esprit".
 
 L'utilisateur va faire le rituel : "${ritualKey}"
 

@@ -1,5 +1,5 @@
 // ============================================
-// DÉCODE TON ESPRIT — MAIN APP
+// HACK TON ESPRIT — MAIN APP
 // ============================================
 
 import { Hono } from 'hono';
@@ -718,7 +718,7 @@ function getMainHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Décode Ton Esprit — Le Jeu de Ta Vie</title>
+  <title>Hack Ton Esprit — Le Jeu de Ta Vie</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
@@ -749,7 +749,7 @@ function getMainHTML(): string {
       <div class="mb-8">
         <span class="text-6xl mb-4 block">🧠</span>
         <h1 class="text-5xl md:text-7xl font-black mb-4 glow">
-          DÉCODE<br><span class="text-violet-400">TON ESPRIT</span>
+          HACK<br><span class="text-violet-400">TON ESPRIT</span>
         </h1>
         <p class="text-xl md:text-2xl text-gray-300 font-light">Le Jeu de Ta Vie</p>
       </div>
@@ -926,7 +926,7 @@ function getAppHTML(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Décode Ton Esprit — Dashboard</title>
+  <title>Hack Ton Esprit — Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
@@ -965,7 +965,7 @@ function getAppHTML(): string {
     <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="text-2xl">🧠</span>
-        <span class="font-bold text-lg hidden sm:block">Décode Ton Esprit</span>
+        <span class="font-bold text-lg hidden sm:block">Hack Ton Esprit</span>
       </div>
       <div class="flex items-center gap-4">
         <div id="streakBadge" class="flex items-center gap-1 px-3 py-1 bg-orange-500/20 rounded-full text-orange-300 text-sm">
