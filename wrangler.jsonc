@@ -8,7 +8,7 @@
     {
       "binding": "DB",
       "database_name": "decode-ton-esprit-db",
-      "database_id": "local-dev-db"
+      "database_id": "25df093a-562b-4a47-834e-dc8ea7cf3125"
     }
   ]
 }
