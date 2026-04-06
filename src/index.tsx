@@ -1706,10 +1706,8 @@ function getAppHTML(): string {
   <!-- TOP BAR -->
   <nav class="sticky top-0 z-30 bg-gray-900/90 backdrop-blur-md border-b border-white/10">
     <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
-      <div class="flex items-center gap-2"><span class="text-xl">&#129504;</span><span class="font-bold text-sm sm:text-base">Hack Ton Esprit</span></div>
+      <div class="flex items-center gap-2"><span class="font-bold text-sm sm:text-base">Hack Ton Esprit</span></div>
       <div class="flex items-center gap-2 sm:gap-3">
-        <div class="flex items-center gap-1 px-2.5 py-1 bg-orange-500/20 rounded-full text-orange-300 text-xs"><i class="fas fa-fire text-[10px]"></i><span id="streakCount">0</span></div>
-        <div id="xpBadge" class="flex items-center gap-1 px-2.5 py-1 bg-violet-500/20 rounded-full text-violet-300 text-xs cursor-pointer" onclick="showTab('dashboard')"><i class="fas fa-star text-[10px]"></i><span id="globalLevel">Nv.1</span></div>
         <button onclick="logout()" class="text-gray-500 hover:text-white text-sm p-1" title="Deconnexion"><i class="fas fa-sign-out-alt"></i></button>
       </div>
     </div>
@@ -2000,6 +1998,7 @@ function getAppJS(): string {
 const API='';let token=localStorage.getItem('token');let userData=null;let emotions={};let userLevel=1;
 if(!token)window.location.href='/';
 const headers=()=>({'Content-Type':'application/json','Authorization':'Bearer '+token});
+let userNavigated=false;
 
 // UNLOCK LEVELS: which global_level unlocks each feature
 const UNLOCK={morning:1,capture:1,evening:2,weekly:3,stats:3,patterns:4,quests:4,rituals:5};
@@ -2011,11 +2010,13 @@ async function init(){try{
   userData=await r.json();
   const er=await fetch(API+'/api/emotions');
   emotions=(await er.json()).emotions;
-  renderDashboard();renderEmotionWheel();showTab('chat');
+  renderDashboard();renderEmotionWheel();
+  if(!userNavigated)showTab('chat');
 }catch(e){console.error('Init:',e)}}
 
 // === TAB NAVIGATION ===
 function showTab(t){
+  userNavigated=true;
   document.querySelectorAll('.tab-content').forEach(el=>el.classList.add('hidden'));
   // Desktop tabs
   document.querySelectorAll('.tab-btn').forEach(el=>{el.classList.remove('border-violet-500','text-violet-300');el.classList.add('border-transparent','text-gray-400')});
