@@ -145,7 +145,7 @@ export const DB_STATEMENTS = [
     FOREIGN KEY (habit_id) REFERENCES micro_habits(id)
   )`,
 
-  // === MODULE 5 : VIDEOGRAPHIE ===
+  // === MODULE 5 : VIDEOGRAPHIE (legacy — table kept for data migration) ===
   `CREATE TABLE IF NOT EXISTS videographies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -161,6 +161,32 @@ export const DB_STATEMENTS = [
     year INTEGER,
     processed INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`,
+
+  // === MODULE 6 : CHATBOT PSY (Mon Psy IA) ===
+  `CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT DEFAULT 'Nouvelle conversation',
+    context_summary TEXT,
+    status TEXT DEFAULT 'active',
+    messages_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    model_used TEXT,
+    tokens_used INTEGER,
+    actions_taken TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`,
 

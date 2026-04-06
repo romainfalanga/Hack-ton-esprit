@@ -56,9 +56,8 @@ app.post('/api/auth/register', async (c) => {
     await db.prepare('INSERT INTO thought_branches (user_id, branch_key, branch_name, description) VALUES (?, ?, ?, ?)').bind(userId, branch.key, branch.name, branch.description).run();
   }
 
-  // Create 3 default system micro-habits
+  // Create 2 default system micro-habits
   const defaultHabits = [
-    { name: 'Videographie hebdomadaire', description: 'Enregistrer un resume video/texte de ta semaine chaque weekend', category: 'fondateur', frequency: 'weekly' },
     { name: 'Emotion forte du soir', description: 'Logger l\'emotion la plus forte de ta journee chaque soir', category: 'fondateur', frequency: 'daily' },
     { name: 'Lettre au futur moi', description: 'Ecrire un message a ton toi dans 10 ans', category: 'fondateur', frequency: 'weekly' },
   ];
@@ -105,7 +104,7 @@ app.use('/api/lifeline/*', authMiddleware);
 app.use('/api/psych/*', authMiddleware);
 app.use('/api/thought/*', authMiddleware);
 app.use('/api/habits/*', authMiddleware);
-app.use('/api/video/*', authMiddleware);
+app.use('/api/chat/*', authMiddleware);
 app.use('/api/letter/*', authMiddleware);
 
 // ============================================
@@ -666,7 +665,6 @@ app.post('/api/psych/generate', async (c) => {
   const decontaminations = await db.prepare('SELECT * FROM decontaminations WHERE user_id = ? ORDER BY created_at DESC LIMIT 10').bind(user.id).all();
   const patterns = await db.prepare('SELECT * FROM patterns WHERE user_id = ?').bind(user.id).all();
   const existingTraits = await db.prepare('SELECT * FROM psych_profile_traits WHERE user_id = ?').bind(user.id).all();
-  const videos = await db.prepare('SELECT ai_summary, ai_key_themes, ai_emotions_detected FROM videographies WHERE user_id = ? AND processed = 1 ORDER BY created_at DESC LIMIT 10').bind(user.id).all();
 
   // Fetch emotions for life events
   const eventsWithEmotions = [];
@@ -695,9 +693,6 @@ ${JSON.stringify(patterns.results || [], null, 2)}
 
 TRAITS DEJA IDENTIFIES :
 ${JSON.stringify((existingTraits.results || []).map((t: any) => ({ key: t.trait_key, name: t.trait_name, probability: t.probability })), null, 2)}
-
-RESUMES VIDEO HEBDO :
-${JSON.stringify(videos.results || [], null, 2)}
 
 Reponds UNIQUEMENT en JSON avec ce format :
 {
@@ -1012,99 +1007,304 @@ app.delete('/api/habits/:id', async (c) => {
 });
 
 // ============================================
-// MODULE 5 — VIDEOGRAPHIE (text-based MVP)
+// MODULE 6 — CHATBOT PSY (Mon Psy IA)
 // ============================================
-app.post('/api/video/submit', async (c) => {
+
+// Helper: build system prompt with all user data
+async function buildChatSystemPrompt(db: D1Database, userId: number): Promise<string> {
+  const user = await db.prepare('SELECT display_name, username, created_at, current_streak, longest_streak FROM users WHERE id = ?').bind(userId).first() as any;
+  const stats = await db.prepare('SELECT * FROM user_stats WHERE user_id = ?').bind(userId).first() as any;
+  const lifeEvents = await db.prepare('SELECT title, description, age_at_event, global_intensity, valence, life_domain FROM life_events WHERE user_id = ? ORDER BY age_at_event ASC LIMIT 30').bind(userId).all();
+  const psychTraits = await db.prepare("SELECT trait_name, category, description, probability FROM psych_profile_traits WHERE user_id = ? AND status = 'active' ORDER BY probability DESC LIMIT 15").bind(userId).all();
+  const lastSnapshot = await db.prepare('SELECT full_profile FROM psych_profile_snapshots WHERE user_id = ? ORDER BY generated_at DESC LIMIT 1').bind(userId).first() as any;
+  const thoughtBranches = await db.prepare('SELECT branch_name, thought_count, dominant_emotion FROM thought_branches WHERE user_id = ? ORDER BY weight DESC LIMIT 9').bind(userId).all();
+  const recentCaptures = await db.prepare('SELECT content, emotion, category, created_at FROM captures WHERE user_id = ? ORDER BY created_at DESC LIMIT 15').bind(userId).all();
+  const recentCheckins = await db.prepare('SELECT type, emotion, emotion_detail, energy_level, strong_emotion, strong_emotion_trigger, created_at FROM checkins WHERE user_id = ? ORDER BY created_at DESC LIMIT 10').bind(userId).all();
+  const patterns = await db.prepare("SELECT pattern_name, confidence, status, evidence FROM patterns WHERE user_id = ? AND status IN ('detected','active') ORDER BY confidence DESC").bind(userId).all();
+
+  let profileSummary = '';
+  if (lastSnapshot?.full_profile) {
+    try {
+      const p = JSON.parse(lastSnapshot.full_profile);
+      profileSummary = `\nSYNTHESE DU PROFIL PSY :\n${p.global_summary || ''}\nForces: ${(p.strengths || []).join(', ')}\nAxes de developpement: ${(p.growth_areas || []).join(', ')}\nDynamiques cles: ${(p.key_dynamics || []).join(', ')}`;
+    } catch {}
+  }
+
+  return `Tu es "Mon Psy IA", un psychologue clinicien virtuel bienveillant et chaleureux, specialise en therapie cognitive et comportementale (TCC). Tu fais partie de l'application "Hack Ton Esprit", un jeu gamifie de developpement personnel.
+
+TON ROLE :
+- Ecouter activement, reformuler, poser des questions profondes
+- Collecter des informations sur la vie de l'utilisateur (evenements, emotions, pensees)
+- Aider a identifier des patterns de pensee, biais cognitifs, schemas emotionnels
+- Donner des conseils personnalises bases sur les TCC
+- Tu tutoies l'utilisateur et tu es chaleureux mais professionnel
+- Tu poses UNE question a la fois, pas des listes
+- Tu adaptes tes reponses a la maturite emotionnelle de l'utilisateur
+
+DONNEES DE L'UTILISATEUR (${user?.display_name || user?.username || 'inconnu'}) :
+- Inscription: ${user?.created_at || 'recente'}
+- Streak actuel: ${user?.current_streak || 0} jours
+- Niveau global: ${stats?.global_level || 1}/10
+- XP total: ${stats?.total_xp || 0}
+
+EVENEMENTS DE VIE (Ligne de vie) :
+${JSON.stringify((lifeEvents.results || []).slice(0, 20), null, 1)}
+
+TRAITS PSYCHOLOGIQUES DETECTES :
+${JSON.stringify((psychTraits.results || []).map((t: any) => ({ nom: t.trait_name, categorie: t.category, probabilite: t.probability, description: t.description })), null, 1)}
+${profileSummary}
+
+ARBRE DES PENSEES (branches principales) :
+${JSON.stringify((thoughtBranches.results || []).map((b: any) => ({ branche: b.branch_name, pensees: b.thought_count, emotion_dominante: b.dominant_emotion })), null, 1)}
+
+PATTERNS COMPORTEMENTAUX DETECTES :
+${JSON.stringify((patterns.results || []).map((p: any) => ({ nom: p.pattern_name, confiance: p.confidence, status: p.status })), null, 1)}
+
+CAPTURES RECENTES (pensees spontanees) :
+${JSON.stringify((recentCaptures.results || []).slice(0, 10).map((c: any) => ({ contenu: c.content, emotion: c.emotion, categorie: c.category })), null, 1)}
+
+CHECK-INS RECENTS :
+${JSON.stringify((recentCheckins.results || []).slice(0, 5).map((c: any) => ({ type: c.type, emotion: c.emotion, detail: c.emotion_detail, energie: c.energy_level, emotion_forte: c.strong_emotion })), null, 1)}
+
+ACTIONS AUTOMATIQUES :
+Quand l'utilisateur partage des informations significatives, tu PEUX inclure un bloc JSON a la fin de ta reponse (APRES ton texte) avec des actions automatiques. Ce bloc sera parse par le systeme.
+Format: |||ACTIONS|||{"actions": [...]}|||END_ACTIONS|||
+
+Actions disponibles :
+1. Ajouter un evenement a la Ligne de vie :
+   {"type": "add_life_event", "title": "...", "description": "...", "age_at_event": N, "global_intensity": 1-10, "valence": "positive|negative|mixed", "life_domain": "famille|relation|travail|sante|argent|amitie|education|identite|perte|reussite|traumatisme|quotidien", "emotions": [{"emotion":"...", "intensity": 1-10}]}
+
+2. Categoriser une pensee dans l'Arbre :
+   {"type": "add_thought", "content": "la pensee", "branches": ["soi","relations","travail","sante","argent","sens","passe","futur","quotidien"]}
+
+3. Suggerer un trait psychologique :
+   {"type": "suggest_trait", "category": "attachment|defense|bias|emotional_regulation|relational|identity|cognitive", "trait_key": "unique_key", "trait_name": "Nom", "description": "...", "probability": 0.0-1.0, "evidence": ["..."]}
+
+REGLES D'ACTIONS :
+- N'ajoute des actions que quand l'utilisateur partage des faits CONCRETS (evenements, situations vecues)
+- Ne force PAS les actions a chaque message
+- Sois conservateur: mieux vaut peu d'actions pertinentes que beaucoup d'actions faibles
+- Pour les traits, commence avec une probabilite faible (0.3-0.5) sauf evidence forte
+- Utilise le domaine de vie le plus pertinent
+
+IMPORTANT : Ton texte de reponse doit etre NATUREL et conversationnel. Les actions sont INVISIBLES pour l'utilisateur (le systeme les traite en arriere-plan). Ne mentionne JAMAIS les actions dans ton texte.`;
+}
+
+// Select best AI model based on context
+function selectModel(messagesCount: number, hasDeepContent: boolean): string {
+  // First messages or simple conversation: fast model
+  if (messagesCount < 3 && !hasDeepContent) return 'google/gemini-2.0-flash-001';
+  // Deep analysis needed: powerful model
+  if (hasDeepContent) return 'google/gemini-2.5-flash-preview-05-20';
+  // Regular conversation
+  return 'google/gemini-2.0-flash-001';
+}
+
+// Parse actions from AI response
+function parseActions(response: string): { text: string; actions: any[] } {
+  const actionMatch = response.match(/\|\|\|ACTIONS\|\|\|([\s\S]*?)\|\|\|END_ACTIONS\|\|\|/);
+  let text = response;
+  let actions: any[] = [];
+  if (actionMatch) {
+    text = response.replace(actionMatch[0], '').trim();
+    try {
+      const parsed = JSON.parse(actionMatch[1]);
+      actions = parsed.actions || [];
+    } catch {}
+  }
+  return { text, actions };
+}
+
+// Execute actions from AI response
+async function executeActions(db: D1Database, userId: number, actions: any[]): Promise<string[]> {
+  const results: string[] = [];
+  for (const action of actions) {
+    try {
+      if (action.type === 'add_life_event' && action.title) {
+        const r = await db.prepare(
+          'INSERT INTO life_events (user_id, title, description, age_at_event, global_intensity, valence, life_domain, source_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(userId, action.title, action.description || null, action.age_at_event || null, action.global_intensity || 5, action.valence || 'mixed', action.life_domain || 'quotidien', 'chatbot').run();
+        const eventId = r.meta.last_row_id;
+        if (action.emotions && Array.isArray(action.emotions)) {
+          for (const emo of action.emotions.slice(0, 5)) {
+            await db.prepare('INSERT INTO life_event_emotions (event_id, emotion, intensity) VALUES (?, ?, ?)').bind(eventId, emo.emotion, emo.intensity || 5).run();
+          }
+        }
+        await awardXP(db, userId, { lucidity: 5, resonance: 3 }, 'chatbot_life_event', eventId as number, 'Ligne de vie (via Psy IA): ' + action.title);
+        results.push('life_event:' + action.title);
+      }
+      else if (action.type === 'add_thought' && action.content) {
+        const entryR = await db.prepare(
+          'INSERT INTO thought_entries (user_id, content, source_type, ai_analysis) VALUES (?, ?, ?, ?)'
+        ).bind(userId, action.content, 'chatbot', 'Categorise par Mon Psy IA').run();
+        const entryId = entryR.meta.last_row_id;
+        for (const bKey of (action.branches || [])) {
+          const branch = await db.prepare('SELECT id FROM thought_branches WHERE user_id = ? AND branch_key = ?').bind(userId, bKey).first() as any;
+          if (branch) {
+            await db.prepare('INSERT OR IGNORE INTO thought_entry_branches (entry_id, branch_id) VALUES (?, ?)').bind(entryId, branch.id).run();
+            await db.prepare('UPDATE thought_branches SET thought_count = thought_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(branch.id).run();
+          }
+        }
+        results.push('thought:' + action.content.substring(0, 30));
+      }
+      else if (action.type === 'suggest_trait' && action.trait_key) {
+        const existing = await db.prepare('SELECT id, probability FROM psych_profile_traits WHERE user_id = ? AND trait_key = ?').bind(userId, action.trait_key).first() as any;
+        if (existing) {
+          const newProb = Math.min(1, Math.max(0, (existing.probability + action.probability) / 2 + 0.05));
+          await db.prepare('UPDATE psych_profile_traits SET probability = ?, description = ?, evidence = ?, last_updated_at = CURRENT_TIMESTAMP, update_count = update_count + 1 WHERE id = ?')
+            .bind(newProb, action.description || existing.description, JSON.stringify(action.evidence || []), existing.id).run();
+          results.push('trait_updated:' + action.trait_name);
+        } else {
+          await db.prepare('INSERT INTO psych_profile_traits (user_id, category, trait_key, trait_name, description, probability, evidence) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .bind(userId, action.category || 'cognitive', action.trait_key, action.trait_name, action.description || '', action.probability || 0.4, JSON.stringify(action.evidence || [])).run();
+          results.push('trait_new:' + action.trait_name);
+        }
+      }
+    } catch (e) {
+      results.push('error:' + action.type);
+    }
+  }
+  return results;
+}
+
+// Get or create active conversation
+app.get('/api/chat/conversations', async (c) => {
+  const user = c.get('user');
+  const db = c.env.DB;
+  const conversations = await db.prepare(
+    'SELECT id, title, status, messages_count, created_at, updated_at FROM conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 20'
+  ).bind(user.id).all();
+  return c.json({ conversations: conversations.results || [] });
+});
+
+app.post('/api/chat/conversation/new', async (c) => {
+  const user = c.get('user');
+  const db = c.env.DB;
+  const result = await db.prepare(
+    'INSERT INTO conversations (user_id) VALUES (?)'
+  ).bind(user.id).run();
+  return c.json({ success: true, conversation_id: result.meta.last_row_id });
+});
+
+// Get messages for a conversation
+app.get('/api/chat/messages/:conversationId', async (c) => {
+  const user = c.get('user');
+  const db = c.env.DB;
+  const convId = Number(c.req.param('conversationId'));
+
+  const conv = await db.prepare('SELECT id FROM conversations WHERE id = ? AND user_id = ?').bind(convId, user.id).first();
+  if (!conv) return c.json({ error: 'Conversation non trouvee' }, 404);
+
+  const messages = await db.prepare(
+    'SELECT id, role, content, created_at FROM chat_messages WHERE conversation_id = ? AND user_id = ? ORDER BY created_at ASC'
+  ).bind(convId, user.id).all();
+
+  return c.json({ messages: messages.results || [] });
+});
+
+// Send a message to the chatbot
+app.post('/api/chat/send', async (c) => {
   const user = c.get('user');
   const db = c.env.DB;
   const apiKey = c.env.OPENROUTER_API_KEY;
-  const { title, text_summary } = await c.req.json();
+  const { conversation_id, message } = await c.req.json();
 
-  if (!text_summary) return c.json({ error: 'Resume requis' }, 400);
+  if (!message?.trim()) return c.json({ error: 'Message requis' }, 400);
+  if (!apiKey) return c.json({ error: 'Cle API non configuree' }, 500);
 
-  const now = new Date();
-  const weekNumber = getWeekNumber();
-  const year = now.getFullYear();
+  let convId = conversation_id;
 
-  const result = await db.prepare(
-    'INSERT INTO videographies (user_id, title, transcript, week_number, year) VALUES (?, ?, ?, ?, ?)'
-  ).bind(user.id, title || `Semaine ${weekNumber}`, text_summary, weekNumber, year).run();
-
-  const videoId = result.meta.last_row_id as number;
-
-  // AI analysis of the summary
-  if (apiKey) {
-    try {
-      const prompt = `Analyse ce resume hebdomadaire d'un utilisateur dans une application de developpement personnel.
-
-RESUME DE LA SEMAINE :
-"${text_summary}"
-
-Reponds en JSON:
-{
-  "summary": "Resume structure (3-4 phrases)",
-  "key_themes": ["theme1", "theme2", "theme3"],
-  "emotions_detected": [{"emotion": "nom", "intensity": 7}],
-  "life_events_extracted": [{"title": "titre court", "description": "description", "valence": "positive|negative|mixed", "life_domain": "famille|travail|sante|relation|identite|quotidien", "intensity": 7}],
-  "patterns_observed": ["observation1", "observation2"],
-  "growth_signals": ["signal positif 1"]
-}`;
-
-      const response = await callAI(apiKey, {
-        messages: [{ role: 'user', content: prompt }],
-        model: 'google/gemini-2.0-flash-001',
-        temperature: 0.3,
-        max_tokens: 2000,
-      });
-
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const analysis = JSON.parse(jsonMatch[0]);
-
-        await db.prepare(
-          'UPDATE videographies SET ai_summary = ?, ai_key_themes = ?, ai_emotions_detected = ?, ai_life_events_extracted = ?, processed = 1 WHERE id = ?'
-        ).bind(
-          analysis.summary,
-          JSON.stringify(analysis.key_themes || []),
-          JSON.stringify(analysis.emotions_detected || []),
-          JSON.stringify(analysis.life_events_extracted || []),
-          videoId
-        ).run();
-
-        // Auto-create life events from video
-        for (const evt of (analysis.life_events_extracted || [])) {
-          const evtResult = await db.prepare(
-            'INSERT INTO life_events (user_id, title, description, global_intensity, valence, life_domain, source_type, source_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-          ).bind(user.id, evt.title, evt.description || null, evt.intensity || 5, evt.valence || 'mixed', evt.life_domain || 'quotidien', 'video', videoId).run();
-
-          // Add detected emotions
-          for (const emo of (analysis.emotions_detected || []).slice(0, 3)) {
-            await db.prepare('INSERT INTO life_event_emotions (event_id, emotion, intensity) VALUES (?, ?, ?)').bind(evtResult.meta.last_row_id, emo.emotion, emo.intensity || 5).run();
-          }
-        }
-
-        // Award XP
-        const xp = await awardXP(db, user.id, { resonance: 25, lucidity: 15, action: 10 }, 'videography', videoId, `Videographie semaine ${weekNumber}`);
-
-        return c.json({ success: true, id: videoId, analysis, xp, life_events_created: (analysis.life_events_extracted || []).length });
-      }
-    } catch (e: any) {
-      // Fallback: still save without AI
-    }
+  // Create conversation if needed
+  if (!convId) {
+    const conv = await db.prepare('INSERT INTO conversations (user_id) VALUES (?)').bind(user.id).run();
+    convId = conv.meta.last_row_id;
   }
 
-  // No AI fallback
-  await db.prepare('UPDATE videographies SET ai_summary = ?, processed = 1 WHERE id = ?').bind(text_summary, videoId).run();
-  const xp = await awardXP(db, user.id, { resonance: 15, action: 5 }, 'videography', videoId, `Videographie semaine ${weekNumber}`);
+  // Verify ownership
+  const conv = await db.prepare('SELECT id, messages_count FROM conversations WHERE id = ? AND user_id = ?').bind(convId, user.id).first() as any;
+  if (!conv) return c.json({ error: 'Conversation non trouvee' }, 404);
 
-  return c.json({ success: true, id: videoId, xp });
+  // Save user message
+  await db.prepare(
+    'INSERT INTO chat_messages (conversation_id, user_id, role, content) VALUES (?, ?, ?, ?)'
+  ).bind(convId, user.id, 'user', message).run();
+
+  // Build conversation history (last 20 messages for context)
+  const history = await db.prepare(
+    'SELECT role, content FROM chat_messages WHERE conversation_id = ? AND user_id = ? ORDER BY created_at ASC'
+  ).bind(convId, user.id).all();
+
+  const messages_list = (history.results || []).map((m: any) => ({
+    role: m.role,
+    content: m.content
+  }));
+
+  // Build system prompt with full user context
+  const systemPrompt = await buildChatSystemPrompt(db, user.id);
+
+  // Detect deep content (long messages, emotional keywords)
+  const deepKeywords = ['mort', 'trauma', 'deuil', 'suicide', 'deprime', 'abus', 'violence', 'viol', 'abandon', 'divorce', 'rupture', 'angoisse', 'panique'];
+  const hasDeepContent = deepKeywords.some(k => message.toLowerCase().includes(k)) || message.length > 300;
+  const model = selectModel(conv.messages_count || 0, hasDeepContent);
+
+  try {
+    const aiResponse = await callAI(apiKey, {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages_list.slice(-20)
+      ],
+      model,
+      temperature: 0.7,
+      max_tokens: 1500,
+    });
+
+    // Parse actions from response
+    const { text: cleanResponse, actions } = parseActions(aiResponse);
+
+    // Execute actions (add life events, categorize thoughts, etc.)
+    let actionResults: string[] = [];
+    if (actions.length > 0) {
+      actionResults = await executeActions(db, user.id, actions);
+    }
+
+    // Save AI response
+    await db.prepare(
+      'INSERT INTO chat_messages (conversation_id, user_id, role, content, model_used, actions_taken) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(convId, user.id, 'assistant', cleanResponse, model, actionResults.length > 0 ? JSON.stringify(actionResults) : null).run();
+
+    // Update conversation
+    await db.prepare(
+      'UPDATE conversations SET messages_count = messages_count + 2, updated_at = CURRENT_TIMESTAMP, title = CASE WHEN messages_count = 0 THEN ? ELSE title END WHERE id = ?'
+    ).bind(message.substring(0, 60), convId).run();
+
+    // Award small XP for chatting (every 5 messages)
+    let xp = null;
+    const newCount = (conv.messages_count || 0) + 2;
+    if (newCount % 10 === 0) {
+      xp = await awardXP(db, user.id, { resonance: 3, lucidity: 2 }, 'chat', convId as number, 'Discussion avec Mon Psy IA');
+    }
+
+    return c.json({
+      success: true,
+      conversation_id: convId,
+      response: cleanResponse,
+      model_used: model,
+      actions_executed: actionResults.length,
+      xp
+    });
+  } catch (e: any) {
+    return c.json({ error: 'Erreur IA: ' + e.message }, 500);
+  }
 });
 
-app.get('/api/video/list', async (c) => {
+// Delete a conversation
+app.delete('/api/chat/conversation/:id', async (c) => {
   const user = c.get('user');
   const db = c.env.DB;
-  const videos = await db.prepare('SELECT * FROM videographies WHERE user_id = ? ORDER BY created_at DESC').bind(user.id).all();
-  return c.json({ videos: videos.results || [] });
+  const convId = Number(c.req.param('id'));
+  await db.prepare('DELETE FROM chat_messages WHERE conversation_id = ? AND user_id = ?').bind(convId, user.id).run();
+  await db.prepare('DELETE FROM conversations WHERE id = ? AND user_id = ?').bind(convId, user.id).run();
+  return c.json({ success: true });
 });
 
 // ============================================
@@ -1369,6 +1569,9 @@ function getAppHTML(): string {
     /* Safe bottom padding for content */
     .safe-bottom{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
     @media(min-width:768px){.safe-bottom{padding-bottom:32px}}
+    /* Chat specific styles */
+    #chatMessages{scrollbar-width:thin;scrollbar-color:rgba(139,92,246,.2) transparent}
+    #chatInput{min-height:40px;max-height:120px}
     /* Desktop top tabs */
     @media(max-width:767px){.desktop-tabs{display:none!important}}
     @media(min-width:768px){.bottom-nav{display:none!important}}
@@ -1387,29 +1590,28 @@ function getAppHTML(): string {
     </div>
     <!-- Desktop tabs -->
     <div class="desktop-tabs max-w-5xl mx-auto px-4 flex gap-1 border-t border-white/5">
-      <button onclick="showTab('dashboard')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="dashboard"><i class="fas fa-home mr-1"></i>Accueil</button>
+      <button onclick="showTab('chat')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="chat"><i class="fas fa-comments mr-1"></i>Mon Psy IA</button>
       <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="lifeline"><i class="fas fa-timeline mr-1"></i>Ligne de vie</button>
-      <button onclick="showTab('habits')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="habits"><i class="fas fa-list-check mr-1"></i>Habitudes</button>
-      <button onclick="showTab('video')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="video"><i class="fas fa-video mr-1"></i>Video</button>
       <button onclick="showTab('psych')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="psych"><i class="fas fa-user-doctor mr-1"></i>Profil Psy</button>
       <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="thoughttree"><i class="fas fa-sitemap mr-1"></i>Arbre</button>
+      <button onclick="showTab('habits')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="habits"><i class="fas fa-list-check mr-1"></i>Habitudes</button>
+      <button onclick="showTab('dashboard')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="dashboard"><i class="fas fa-home mr-1"></i>Accueil</button>
     </div>
   </nav>
 
   <!-- MAIN CONTENT -->
-  <main class="max-w-5xl mx-auto px-4 py-4 safe-bottom">
+  <main id="mainContent" class="max-w-5xl mx-auto px-4 py-4 safe-bottom">
 ` + getAllTabsHTML() + `
   </main>
 
   <!-- MOBILE BOTTOM NAV -->
   <div class="bottom-nav">
     <div class="flex justify-around items-center px-1 pt-1">
-      <button onclick="showTab('dashboard')" class="bottom-nav-btn active" data-tab="dashboard"><i class="fas fa-home"></i><span>Accueil</span></button>
+      <button onclick="showTab('chat')" class="bottom-nav-btn active" data-tab="chat"><i class="fas fa-comments"></i><span>Psy IA</span></button>
       <button onclick="showTab('lifeline')" class="bottom-nav-btn" data-tab="lifeline"><i class="fas fa-timeline"></i><span>Vie</span></button>
-      <button onclick="showTab('habits')" class="bottom-nav-btn" data-tab="habits"><i class="fas fa-list-check"></i><span>Habitudes</span></button>
-      <button onclick="showTab('video')" class="bottom-nav-btn" data-tab="video"><i class="fas fa-video"></i><span>Video</span></button>
       <button onclick="showTab('psych')" class="bottom-nav-btn" data-tab="psych"><i class="fas fa-user-doctor"></i><span>Profil</span></button>
       <button onclick="showTab('thoughttree')" class="bottom-nav-btn" data-tab="thoughttree"><i class="fas fa-sitemap"></i><span>Arbre</span></button>
+      <button onclick="showTab('habits')" class="bottom-nav-btn" data-tab="habits"><i class="fas fa-list-check"></i><span>Habitudes</span></button>
     </div>
   </div>
 
@@ -1498,7 +1700,7 @@ function getAppHTML(): string {
 // TAB FRAGMENTS (v4 — Enhanced Lock & Mobile)
 // ============================================
 function getAllTabsHTML(): string {
-  return getDashboardTab() + getLifelineTab() + getHabitsTab() + getVideoTab() + getPsychTab() + getThoughtTreeTab();
+  return getChatTab() + getDashboardTab() + getLifelineTab() + getHabitsTab() + getPsychTab() + getThoughtTreeTab();
 }
 
 function getDashboardTab(): string {
@@ -1597,18 +1799,46 @@ function getHabitsTab(): string {
 
 // Weekly is now integrated into dashboard, no separate tab
 
-function getVideoTab(): string {
-  return `<div id="tab-video" class="tab-content hidden fade-in">
-  <h2 class="text-lg font-bold mb-1"><i class="fas fa-video text-rose-400 mr-2"></i>Videographie hebdo</h2>
-  <p class="text-xs text-gray-400 mb-4">Chaque weekend, resume ta semaine. L'IA analysera et extraira des evenements de vie.</p>
-  <div class="card rounded-xl p-4 mb-4">
-    <h3 class="font-semibold text-sm mb-2">Resume de la semaine</h3>
-    <input type="text" id="videoTitle" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Titre (optionnel)">
-    <textarea id="videoSummary" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="6" placeholder="Raconte ta semaine... moments forts, emotions, surprises, difficultes..."></textarea>
-    <button onclick="submitVideo()" class="w-full mt-2 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-paper-plane mr-2"></i>Envoyer (+25 XP)</button>
+function getChatTab(): string {
+  return `<div id="tab-chat" class="tab-content fade-in">
+  <div class="flex flex-col" style="height:calc(100dvh - 130px)">
+    <!-- Chat header -->
+    <div class="flex items-center justify-between mb-2 flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-full bg-violet-500/30 flex items-center justify-center"><i class="fas fa-brain text-violet-300"></i></div>
+        <div><h2 class="font-bold text-sm">Mon Psy IA</h2><p class="text-[10px] text-gray-400" id="chatStatus">En ligne</p></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="loadConversationHistory()" class="text-gray-400 hover:text-white text-sm p-1.5" title="Historique"><i class="fas fa-clock-rotate-left"></i></button>
+        <button onclick="startNewConversation()" class="text-gray-400 hover:text-white text-sm p-1.5" title="Nouvelle conversation"><i class="fas fa-plus"></i></button>
+      </div>
+    </div>
+
+    <!-- Conversation history sidebar (hidden by default) -->
+    <div id="chatHistoryPanel" class="hidden card rounded-xl p-3 mb-2 max-h-40 overflow-y-auto flex-shrink-0">
+      <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Conversations</h4>
+      <div id="chatHistoryList" class="space-y-1"></div>
+    </div>
+
+    <!-- Messages area -->
+    <div id="chatMessages" class="flex-1 overflow-y-auto space-y-3 mb-2 px-1 scroll-smooth" style="min-height:0">
+      <div class="flex gap-2">
+        <div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div>
+        <div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]">
+          <p class="text-xs text-gray-300 leading-relaxed">Salut ! Je suis <span class="text-violet-300 font-medium">Mon Psy IA</span>, ton compagnon de route dans Hack Ton Esprit. Je suis la pour t'ecouter, t'aider a comprendre tes schemas de pensee et construire ton profil psychologique.</p>
+          <p class="text-xs text-gray-300 leading-relaxed mt-2">Comment te sens-tu aujourd'hui ?</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input area -->
+    <div class="flex-shrink-0">
+      <div class="flex gap-2 items-end">
+        <textarea id="chatInput" class="flex-1 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="1" placeholder="Ecris ici..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChatMessage()}" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button onclick="sendChatMessage()" id="chatSendBtn" class="w-10 h-10 rounded-xl bg-violet-600 hover:bg-violet-500 flex items-center justify-center text-white transition-all flex-shrink-0"><i class="fas fa-paper-plane text-sm"></i></button>
+      </div>
+    </div>
   </div>
-  <h3 class="font-semibold text-sm mb-2">Historique</h3>
-  <div id="videoList" class="space-y-2"><p class="text-gray-500 text-xs">Aucune videographie encore.</p></div>
 </div>`;
 }
 
@@ -1656,7 +1886,7 @@ async function init(){try{
   userData=await r.json();
   const er=await fetch(API+'/api/emotions');
   emotions=(await er.json()).emotions;
-  renderDashboard();renderEmotionWheel();showTab('dashboard');
+  renderDashboard();renderEmotionWheel();showTab('chat');
 }catch(e){console.error('Init:',e)}}
 
 // === TAB NAVIGATION ===
@@ -1671,9 +1901,13 @@ function showTab(t){
     if(btn.classList.contains('tab-btn')){btn.classList.add('border-violet-500','text-violet-300');btn.classList.remove('border-transparent','text-gray-400')}
     if(btn.classList.contains('bottom-nav-btn'))btn.classList.add('active')
   });
-  if(t==='lifeline')loadLifeline();if(t==='habits')loadHabits();if(t==='video')loadVideos();
+  // Hide FAB on chat tab, show elsewhere
+  const fab=document.querySelector('.capture-fab');if(fab){fab.style.display=t==='chat'?'none':'flex'}
+  // Adjust padding for chat tab (no safe-bottom needed)
+  const main=document.getElementById('mainContent');if(main){if(t==='chat'){main.classList.remove('safe-bottom');main.style.paddingBottom='0'}else{main.classList.add('safe-bottom');main.style.paddingBottom=''}}
+  if(t==='lifeline')loadLifeline();if(t==='habits')loadHabits();
   if(t==='psych')loadPsychProfile();if(t==='thoughttree')loadThoughtTree();
-  if(t==='dashboard')renderDashboard();
+  if(t==='dashboard')renderDashboard();if(t==='chat')initChat();
 }
 
 // === LOCK SYSTEM ===
@@ -1865,19 +2099,79 @@ async function logHabit(id){
 
 async function deleteHabit(id){if(!confirm('Supprimer ?'))return;try{await fetch(API+'/api/habits/'+id,{method:'DELETE',headers:headers()});loadHabits()}catch(e){}}
 
-// === VIDEO ===
-async function loadVideos(){
-  try{const r=await fetch(API+'/api/video/list',{headers:headers()});const d=await r.json();const el=document.getElementById('videoList');
-  if(!d.videos?.length){el.innerHTML='<p class="text-gray-500 text-xs">Aucune videographie.</p>';return}
-  el.innerHTML=d.videos.map(v=>{const themes=v.ai_key_themes?JSON.parse(v.ai_key_themes).map(t=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300">'+t+'</span>').join(' '):'';
-    return '<div class="card rounded-xl p-3"><div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-sm">'+(v.title||'S'+v.week_number)+'</h3><span class="text-[10px] text-gray-500">S'+v.week_number+'/'+v.year+'</span></div>'+(v.ai_summary?'<p class="text-xs text-gray-400 mb-1 line-clamp-2">'+v.ai_summary+'</p>':'')+'<div class="flex flex-wrap gap-1">'+themes+'</div></div>'}).join('')}catch(e){console.error(e)}}
+// === CHATBOT PSY IA ===
+let currentConvId=null;let chatInitialized=false;
+function initChat(){if(chatInitialized)return;chatInitialized=true;loadActiveConversation()}
 
-async function submitVideo(){
-  const txt=document.getElementById('videoSummary').value;if(!txt.trim()){showToast('\\u26A0','Ecris un resume');return}
-  showToast('\\u{1F3AC}','Analyse en cours...');
-  try{const r=await fetch(API+'/api/video/submit',{method:'POST',headers:headers(),body:JSON.stringify({title:document.getElementById('videoTitle').value,text_summary:txt})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}document.getElementById('videoSummary').value='';document.getElementById('videoTitle').value='';
-  showToast('\\u{1F3AC}','+'+(d.xp?.total_awarded||25)+' XP'+(d.life_events_created?' | '+d.life_events_created+' events':''));loadVideos();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+async function loadActiveConversation(){
+  try{const r=await fetch(API+'/api/chat/conversations',{headers:headers()});const d=await r.json();
+  const convs=d.conversations||[];
+  const active=convs.find(c=>c.status==='active');
+  if(active){currentConvId=active.id;await loadChatMessages(active.id)}
+  }catch(e){console.error('Chat init error:',e)}}
+
+async function loadChatMessages(convId){
+  try{const r=await fetch(API+'/api/chat/messages/'+convId,{headers:headers()});const d=await r.json();
+  const el=document.getElementById('chatMessages');
+  // Keep welcome message then add history
+  let h=el.innerHTML.split('</div>\\n    </div>')[0];
+  h=''; // Clear and rebuild
+  // Welcome message
+  h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">Salut ! Je suis <span class="text-violet-300 font-medium">Mon Psy IA</span>. On reprend notre conversation ?</p></div></div>';
+  for(const m of (d.messages||[])){
+    if(m.role==='user'){h+='<div class="flex gap-2 justify-end"><div class="bg-violet-600/30 border border-violet-500/20 rounded-xl rounded-tr-sm p-3 max-w-[85%]"><p class="text-xs text-white leading-relaxed">'+escapeHtml(m.content)+'</p></div></div>'}
+    else{h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(m.content)+'</p></div></div>'}
+  }
+  el.innerHTML=h;el.scrollTop=el.scrollHeight}catch(e){}}
+
+function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\\n/g,'<br>')}
+function formatAIMessage(t){return escapeHtml(t).replace(/\\*\\*(.+?)\\*\\*/g,'<strong class="text-violet-300">$1</strong>').replace(/\\*(.+?)\\*/g,'<em>$1</em>')}
+
+async function sendChatMessage(){
+  const input=document.getElementById('chatInput');const msg=input.value.trim();if(!msg)return;
+  const btn=document.getElementById('chatSendBtn');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin text-sm"></i>';
+  // Add user message to UI
+  const el=document.getElementById('chatMessages');
+  el.innerHTML+='<div class="flex gap-2 justify-end"><div class="bg-violet-600/30 border border-violet-500/20 rounded-xl rounded-tr-sm p-3 max-w-[85%]"><p class="text-xs text-white leading-relaxed">'+escapeHtml(msg)+'</p></div></div>';
+  input.value='';input.style.height='auto';el.scrollTop=el.scrollHeight;
+  // Show typing indicator
+  const typingId='typing-'+Date.now();
+  el.innerHTML+='<div id="'+typingId+'" class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3"><p class="text-xs text-gray-500"><i class="fas fa-ellipsis fa-beat-fade"></i> Reflexion en cours...</p></div></div>';
+  el.scrollTop=el.scrollHeight;
+  document.getElementById('chatStatus').textContent='Ecrit...';
+  try{const r=await fetch(API+'/api/chat/send',{method:'POST',headers:headers(),body:JSON.stringify({conversation_id:currentConvId,message:msg})});
+  const d=await r.json();
+  // Remove typing indicator
+  const ti=document.getElementById(typingId);if(ti)ti.remove();
+  if(d.error){el.innerHTML+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-exclamation text-red-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 border-red-500/20"><p class="text-xs text-red-300">'+d.error+'</p></div></div>';el.scrollTop=el.scrollHeight;return}
+  if(!currentConvId)currentConvId=d.conversation_id;
+  // Add AI response
+  el.innerHTML+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(d.response)+'</p>'+(d.actions_executed>0?'<div class="flex items-center gap-1 mt-2 pt-2 border-t border-white/5"><i class="fas fa-wand-magic-sparkles text-[9px] text-violet-400"></i><span class="text-[9px] text-violet-400/70">'+d.actions_executed+' action(s) en arriere-plan</span></div>':'')+'</div></div>';
+  el.scrollTop=el.scrollHeight;
+  if(d.xp)showToast('\\u{1F9E0}','+5 XP conversation !');
+  document.getElementById('chatStatus').textContent='En ligne'}
+  catch(e){const ti=document.getElementById(typingId);if(ti)ti.remove();el.innerHTML+='<div class="text-center text-xs text-red-400 py-2">Erreur de connexion</div>';document.getElementById('chatStatus').textContent='En ligne'}
+  finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane text-sm"></i>'}}
+
+async function startNewConversation(){currentConvId=null;chatInitialized=false;
+  const el=document.getElementById('chatMessages');
+  el.innerHTML='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">Nouvelle conversation ! De quoi veux-tu parler ?</p></div></div>';
+  document.getElementById('chatHistoryPanel').classList.add('hidden');chatInitialized=true}
+
+async function loadConversationHistory(){
+  const panel=document.getElementById('chatHistoryPanel');
+  if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return}
+  panel.classList.remove('hidden');
+  try{const r=await fetch(API+'/api/chat/conversations',{headers:headers()});const d=await r.json();
+  const el=document.getElementById('chatHistoryList');
+  if(!d.conversations?.length){el.innerHTML='<p class="text-[10px] text-gray-500">Aucune conversation.</p>';return}
+  el.innerHTML=d.conversations.map(c=>{const dt=new Date(c.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    return '<div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-all'+(c.id===currentConvId?' bg-violet-500/10':'')+'" onclick="switchConversation('+c.id+')"><div class="flex-1 min-w-0 mr-2"><p class="text-[11px] truncate">'+(c.title||'Conversation')+'</p><p class="text-[9px] text-gray-500">'+dt+' | '+c.messages_count+' msg</p></div><button onclick="event.stopPropagation();deleteConversation('+c.id+')" class="text-gray-600 hover:text-red-400 text-[10px] flex-shrink-0"><i class="fas fa-trash"></i></button></div>'}).join('')}catch(e){}}
+
+async function switchConversation(id){currentConvId=id;await loadChatMessages(id);document.getElementById('chatHistoryPanel').classList.add('hidden')}
+async function deleteConversation(id){if(!confirm('Supprimer cette conversation ?'))return;
+  try{await fetch(API+'/api/chat/conversation/'+id,{method:'DELETE',headers:headers()});
+  if(id===currentConvId){currentConvId=null;startNewConversation()}loadConversationHistory()}catch(e){}}
 
 // === PSYCH PROFILE ===
 async function loadPsychProfile(){
