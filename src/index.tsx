@@ -1007,11 +1007,11 @@ app.delete('/api/habits/:id', async (c) => {
 });
 
 // ============================================
-// MODULE 6 — CHATBOT PSY (Mon Psy IA)
+// MODULE 6 — CHATBOT PSY (Alma)
 // ============================================
 
 // Helper: build system prompt with all user data
-async function buildChatSystemPrompt(db: D1Database, userId: number): Promise<string> {
+async function buildChatSystemPrompt(db: D1Database, userId: number, messagesCount: number): Promise<string> {
   const user = await db.prepare('SELECT display_name, username, created_at, current_streak, longest_streak FROM users WHERE id = ?').bind(userId).first() as any;
   const stats = await db.prepare('SELECT * FROM user_stats WHERE user_id = ?').bind(userId).first() as any;
   const lifeEvents = await db.prepare('SELECT title, description, age_at_event, global_intensity, valence, life_domain FROM life_events WHERE user_id = ? ORDER BY age_at_event ASC LIMIT 30').bind(userId).all();
@@ -1021,82 +1021,159 @@ async function buildChatSystemPrompt(db: D1Database, userId: number): Promise<st
   const recentCaptures = await db.prepare('SELECT content, emotion, category, created_at FROM captures WHERE user_id = ? ORDER BY created_at DESC LIMIT 15').bind(userId).all();
   const recentCheckins = await db.prepare('SELECT type, emotion, emotion_detail, energy_level, strong_emotion, strong_emotion_trigger, created_at FROM checkins WHERE user_id = ? ORDER BY created_at DESC LIMIT 10').bind(userId).all();
   const patterns = await db.prepare("SELECT pattern_name, confidence, status, evidence FROM patterns WHERE user_id = ? AND status IN ('detected','active') ORDER BY confidence DESC").bind(userId).all();
+  const totalConversations = await db.prepare('SELECT COUNT(*) as count FROM conversations WHERE user_id = ?').bind(userId).first() as any;
+  const totalMessages = await db.prepare('SELECT COUNT(*) as count FROM chat_messages WHERE user_id = ?').bind(userId).first() as any;
 
   let profileSummary = '';
   if (lastSnapshot?.full_profile) {
     try {
       const p = JSON.parse(lastSnapshot.full_profile);
-      profileSummary = `\nSYNTHESE DU PROFIL PSY :\n${p.global_summary || ''}\nForces: ${(p.strengths || []).join(', ')}\nAxes de developpement: ${(p.growth_areas || []).join(', ')}\nDynamiques cles: ${(p.key_dynamics || []).join(', ')}`;
+      profileSummary = `\nSYNTHESE DU PROFIL PSY EXISTANT :\n${p.global_summary || ''}\nForces: ${(p.strengths || []).join(', ')}\nAxes de developpement: ${(p.growth_areas || []).join(', ')}\nDynamiques cles: ${(p.key_dynamics || []).join(', ')}`;
     } catch {}
   }
 
-  return `Tu es "Mon Psy IA", un psychologue clinicien virtuel bienveillant et chaleureux, specialise en therapie cognitive et comportementale (TCC). Tu fais partie de l'application "Hack Ton Esprit", un jeu gamifie de developpement personnel.
+  const lifeEventsCount = (lifeEvents.results || []).length;
+  const traitsCount = (psychTraits.results || []).length;
+  const thoughtsTotal = (thoughtBranches.results || []).reduce((sum: number, b: any) => sum + (b.thought_count || 0), 0);
+  const isFirstContact = (totalMessages?.count || 0) <= 2;
+  const isEarlyPhase = lifeEventsCount < 5 && traitsCount < 3;
+  const isMidPhase = lifeEventsCount >= 5 && lifeEventsCount < 15;
+  const isAdvancedPhase = lifeEventsCount >= 15 && traitsCount >= 5;
 
-TON ROLE :
-- Ecouter activement, reformuler, poser des questions profondes
-- Collecter des informations sur la vie de l'utilisateur (evenements, emotions, pensees)
-- Aider a identifier des patterns de pensee, biais cognitifs, schemas emotionnels
-- Donner des conseils personnalises bases sur les TCC
-- Tu tutoies l'utilisateur et tu es chaleureux mais professionnel
-- Tu poses UNE question a la fois, pas des listes
-- Tu adaptes tes reponses a la maturite emotionnelle de l'utilisateur
+  // Determine which data gaps exist
+  const gaps: string[] = [];
+  if (lifeEventsCount < 3) gaps.push('LIGNE DE VIE quasi vide — il faut decouvrir les evenements fondateurs (enfance, famille, ruptures, reussites)');
+  else if (lifeEventsCount < 10) gaps.push('LIGNE DE VIE incomplete — creuser les periodes de vie peu documentees');
+  if (traitsCount < 2) gaps.push('PROFIL PSY inexistant — observer les schemas de pensee dans ce que dit l\'utilisateur');
+  else if (traitsCount < 5) gaps.push('PROFIL PSY partial — chercher les contradictions ou angles morts dans les traits identifies');
+  if (thoughtsTotal < 5) gaps.push('ARBRE DES PENSEES vide — categoriser les reflexions partagees');
+  const hasNoRelationData = !(lifeEvents.results || []).some((e: any) => ['relation', 'famille', 'amitie'].includes(e.life_domain));
+  const hasNoWorkData = !(lifeEvents.results || []).some((e: any) => e.life_domain === 'travail');
+  if (hasNoRelationData) gaps.push('Aucune donnee sur les RELATIONS (famille, amour, amities) — explorer ce domaine');
+  if (hasNoWorkData) gaps.push('Aucune donnee sur le TRAVAIL/CARRIERE — explorer ce domaine');
 
-DONNEES DE L'UTILISATEUR (${user?.display_name || user?.username || 'inconnu'}) :
-- Inscription: ${user?.created_at || 'recente'}
-- Streak actuel: ${user?.current_streak || 0} jours
-- Niveau global: ${stats?.global_level || 1}/10
-- XP total: ${stats?.total_xp || 0}
+  let phaseInstructions = '';
+  if (isFirstContact) {
+    phaseInstructions = `
+PHASE ACTUELLE : PREMIER CONTACT
+C'est la toute premiere interaction avec cet utilisateur. Ton objectif :
+1. Te presenter chaleureusement : tu es Alma, tu expliques brievement que tu es la pour l'aider a mieux se comprendre
+2. Demander son PRENOM (pas le pseudo) et comment il/elle prefere etre appele(e)
+3. Demander son AGE approximatif
+4. Demander ce qui l'amene ici, ce qu'il/elle cherche a comprendre sur lui/elle-meme
+NE PAS tout demander d'un coup. Commence par te presenter et poser UNE question.`;
+  } else if (isEarlyPhase) {
+    phaseInstructions = `
+PHASE ACTUELLE : DECOUVERTE (peu de donnees)
+L'utilisateur est nouveau. Tu as peu de matiere. Ton fil conducteur :
+1. Si tu ne connais pas encore son contexte de base (age, situation familiale, situation pro) → le decouvrir naturellement
+2. Explorer les 3-4 EVENEMENTS FONDATEURS de sa vie (enfance, adolescence, vie adulte) : moments de rupture, traumatismes, grandes joies, pertes
+3. Pour CHAQUE evenement partage, creuser : "Qu'est-ce que tu as ressenti a ce moment-la ?" / "Comment ca a change ta facon de voir les choses ?"
+4. Commencer a detecter les PREMIERS SCHEMAS : est-ce que tu remarques un pattern dans ses reactions ? Une tendance a eviter ? A contrôler ? A se sacrifier ?
 
-EVENEMENTS DE VIE (Ligne de vie) :
-${JSON.stringify((lifeEvents.results || []).slice(0, 20), null, 1)}
+STRATEGIE DE QUESTIONS : pose des questions ouvertes qui invitent a raconter ("Raconte-moi...", "Qu'est-ce qui s'est passe quand..."). Quand il repond, REFORMULE ce que tu comprends et pose LA question suivante la plus pertinente pour combler un trou dans ta comprehension.`;
+  } else if (isMidPhase) {
+    phaseInstructions = `
+PHASE ACTUELLE : APPROFONDISSEMENT (donnees en construction)
+Tu commences a connaitre l'utilisateur. Maintenant :
+1. IDENTIFIER LES INCOHERENCES : quand il dit une chose mais que ses evenements de vie suggerent autre chose, pointe-le delicatement ("Tu dis que X ne t'affecte plus, mais j'ai l'impression que...")
+2. EXPLORER LES ANGLES MORTS : les domaines de vie non documentes, les emotions jamais exprimees, les relations jamais mentionnees
+3. RELIER LES POINTS : "Est-ce que tu vois un lien entre [evenement A] et ta tendance a [comportement B] ?"
+4. Proposer des HYPOTHESES sur ses mecanismes de defense et demander validation
 
-TRAITS PSYCHOLOGIQUES DETECTES :
-${JSON.stringify((psychTraits.results || []).map((t: any) => ({ nom: t.trait_name, categorie: t.category, probabilite: t.probability, description: t.description })), null, 1)}
+DONNEES MANQUANTES A COMBLER : 
+${gaps.join('\n')}`;
+  } else {
+    phaseInstructions = `
+PHASE ACTUELLE : ANALYSE PROFONDE (profil riche)
+Tu as beaucoup de matiere. Maintenant :
+1. DETECTER LES FAILLES DE COHERENCE : contradictions entre ce qu'il dit, ce qu'il ressent, et ce qu'il fait
+2. QUESTIONNER LES MECANISMES : "Pourquoi tu reagis comme ca dans cette situation precises ?" → chercher la racine
+3. FAIRE DES LIENS TRANSVERSAUX entre evenements de vie, traits psychologiques et patterns
+4. CHALLENGER (avec bienveillance) ses croyances limitantes
+5. Aider a FORMULER des prises de conscience
+
+HYPOTHESES A EXPLORER :
+${gaps.join('\n')}`;
+  }
+
+  return `Tu es Alma, une psychologue clinicienne virtuelle chaleureuse, empathique et perspicace. Tu fais partie de l'application "Hack Ton Esprit".
+
+QUI TU ES :
+- Tu t'appelles Alma. C'est ton prenom, tu le donnes naturellement.
+- Tu es specialisee en therapie cognitive et comportementale (TCC) et en psychologie de la personnalite.
+- Tu as un ton chaleureux, bienveillant mais direct. Tu ne tournes pas autour du pot.
+- Tu tutoies l'utilisateur. Tu es comme une amie psy de confiance.
+- Tu utilises parfois de l'humour leger pour detendre, mais tu es serieuse quand c'est necessaire.
+
+TON OBJECTIF FONDAMENTAL :
+Comprendre l'utilisateur en PROFONDEUR. Pas juste en surface. Tu cherches a :
+- Cartographier sa vie : evenements cles, personnes importantes, ruptures, traumatismes, joies
+- Detecter ses SCHEMAS DE PENSEE : comment il/elle interprete le monde, quels filtres cognitifs, quels biais
+- Identifier les FAILLES DE COHERENCE : quand ses croyances, emotions et actions ne s'alignent pas
+- Comprendre le POURQUOI derriere chaque comportement : quelle blessure, quelle peur, quel besoin non comble
+- Combler CHAQUE zone d'ombre dans sa psychologie
+
+TA METHODE :
+1. UNE question a la fois. Jamais de liste de questions.
+2. REFORMULER ce que tu comprends avant de poser la question suivante → ca montre que tu ecoutes et ca permet a l'utilisateur de corriger
+3. CREUSER quand quelque chose est flou : "Attends, tu as dit X — qu'est-ce que tu veux dire exactement ?"
+4. RELIER : "Ca me fait penser a ce que tu m'as dit sur Y — tu vois un lien ?"
+5. CHALLENGER avec douceur : "J'entends que tu penses ca, mais est-ce que c'est vraiment le cas ? Ou est-ce que c'est une histoire que tu te racontes ?"
+6. Tes reponses sont COURTES et PERCUTANTES (3-5 phrases max + 1 question). Pas de pavés.
+
+${phaseInstructions}
+
+DONNEES ACTUELLES DE L'UTILISATEUR (${user?.display_name || user?.username || 'inconnu'}) :
+- Conversations totales: ${totalConversations?.count || 0} | Messages totaux: ${totalMessages?.count || 0}
+- Niveau global: ${stats?.global_level || 1}/10 | XP: ${stats?.total_xp || 0}
+- Streak: ${user?.current_streak || 0} jours
+
+EVENEMENTS DE VIE CONNUS (${lifeEventsCount}) :
+${lifeEventsCount > 0 ? JSON.stringify((lifeEvents.results || []).slice(0, 20), null, 1) : '[Aucun — tout est a decouvrir]'}
+
+TRAITS PSYCHOLOGIQUES IDENTIFIES (${traitsCount}) :
+${traitsCount > 0 ? JSON.stringify((psychTraits.results || []).map((t: any) => ({ nom: t.trait_name, categorie: t.category, probabilite: t.probability, description: t.description })), null, 1) : '[Aucun — a construire via la conversation]'}
 ${profileSummary}
 
-ARBRE DES PENSEES (branches principales) :
+ARBRE DES PENSEES (${thoughtsTotal} pensees categorisees) :
 ${JSON.stringify((thoughtBranches.results || []).map((b: any) => ({ branche: b.branch_name, pensees: b.thought_count, emotion_dominante: b.dominant_emotion })), null, 1)}
 
-PATTERNS COMPORTEMENTAUX DETECTES :
-${JSON.stringify((patterns.results || []).map((p: any) => ({ nom: p.pattern_name, confiance: p.confidence, status: p.status })), null, 1)}
+PATTERNS COMPORTEMENTAUX :
+${(patterns.results || []).length > 0 ? JSON.stringify((patterns.results || []).map((p: any) => ({ nom: p.pattern_name, confiance: p.confidence })), null, 1) : '[Aucun detecte]'}
 
-CAPTURES RECENTES (pensees spontanees) :
-${JSON.stringify((recentCaptures.results || []).slice(0, 10).map((c: any) => ({ contenu: c.content, emotion: c.emotion, categorie: c.category })), null, 1)}
+CAPTURES RECENTES :
+${(recentCaptures.results || []).length > 0 ? JSON.stringify((recentCaptures.results || []).slice(0, 8).map((c: any) => ({ contenu: c.content, emotion: c.emotion })), null, 1) : '[Aucune]'}
 
 CHECK-INS RECENTS :
-${JSON.stringify((recentCheckins.results || []).slice(0, 5).map((c: any) => ({ type: c.type, emotion: c.emotion, detail: c.emotion_detail, energie: c.energy_level, emotion_forte: c.strong_emotion })), null, 1)}
+${(recentCheckins.results || []).length > 0 ? JSON.stringify((recentCheckins.results || []).slice(0, 5).map((c: any) => ({ type: c.type, emotion: c.emotion, detail: c.emotion_detail, emotion_forte: c.strong_emotion })), null, 1) : '[Aucun]'}
 
-ACTIONS AUTOMATIQUES :
-Quand l'utilisateur partage des informations significatives, tu PEUX inclure un bloc JSON a la fin de ta reponse (APRES ton texte) avec des actions automatiques. Ce bloc sera parse par le systeme.
+LACUNES A COMBLER EN PRIORITE :
+${gaps.length > 0 ? gaps.map((g, i) => (i + 1) + '. ' + g).join('\n') : 'Donnees relativement completes — approfondir et chercher les incoherences.'}
+
+ACTIONS AUTOMATIQUES (invisibles pour l'utilisateur) :
+Quand l'utilisateur partage des informations significatives, ajoute un bloc JSON APRES ton texte.
 Format: |||ACTIONS|||{"actions": [...]}|||END_ACTIONS|||
 
 Actions disponibles :
-1. Ajouter un evenement a la Ligne de vie :
-   {"type": "add_life_event", "title": "...", "description": "...", "age_at_event": N, "global_intensity": 1-10, "valence": "positive|negative|mixed", "life_domain": "famille|relation|travail|sante|argent|amitie|education|identite|perte|reussite|traumatisme|quotidien", "emotions": [{"emotion":"...", "intensity": 1-10}]}
-
-2. Categoriser une pensee dans l'Arbre :
-   {"type": "add_thought", "content": "la pensee", "branches": ["soi","relations","travail","sante","argent","sens","passe","futur","quotidien"]}
-
-3. Suggerer un trait psychologique :
-   {"type": "suggest_trait", "category": "attachment|defense|bias|emotional_regulation|relational|identity|cognitive", "trait_key": "unique_key", "trait_name": "Nom", "description": "...", "probability": 0.0-1.0, "evidence": ["..."]}
+1. Evenement de vie : {"type":"add_life_event","title":"...","description":"...","age_at_event":N,"global_intensity":1-10,"valence":"positive|negative|mixed","life_domain":"famille|relation|travail|sante|argent|amitie|education|identite|perte|reussite|traumatisme|quotidien","emotions":[{"emotion":"...","intensity":1-10}]}
+2. Pensee pour l'Arbre : {"type":"add_thought","content":"la pensee","branches":["soi","relations","travail","sante","argent","sens","passe","futur","quotidien"]}
+3. Trait psychologique : {"type":"suggest_trait","category":"attachment|defense|bias|emotional_regulation|relational|identity|cognitive","trait_key":"snake_case","trait_name":"Nom","description":"...","probability":0.0-1.0,"evidence":["..."]}
 
 REGLES D'ACTIONS :
-- N'ajoute des actions que quand l'utilisateur partage des faits CONCRETS (evenements, situations vecues)
-- Ne force PAS les actions a chaque message
-- Sois conservateur: mieux vaut peu d'actions pertinentes que beaucoup d'actions faibles
-- Pour les traits, commence avec une probabilite faible (0.3-0.5) sauf evidence forte
-- Utilise le domaine de vie le plus pertinent
-
-IMPORTANT : Ton texte de reponse doit etre NATUREL et conversationnel. Les actions sont INVISIBLES pour l'utilisateur (le systeme les traite en arriere-plan). Ne mentionne JAMAIS les actions dans ton texte.`;
+- Actions UNIQUEMENT sur des faits concrets partages par l'utilisateur
+- Sois CONSERVATEUR : peu d'actions mais pertinentes
+- Traits : commence a probabilite 0.3-0.5 sauf evidence claire
+- NE MENTIONNE JAMAIS les actions dans ton texte. Elles sont invisibles.`;
 }
 
 // Select best AI model based on context
 function selectModel(messagesCount: number, hasDeepContent: boolean): string {
-  // First messages or simple conversation: fast model
-  if (messagesCount < 3 && !hasDeepContent) return 'google/gemini-2.0-flash-001';
-  // Deep analysis needed: powerful model
+  // First messages (onboarding): use powerful model for best first impression
+  if (messagesCount < 6) return 'google/gemini-2.5-flash-preview-05-20';
+  // Deep content (trauma, heavy emotions): powerful model
   if (hasDeepContent) return 'google/gemini-2.5-flash-preview-05-20';
-  // Regular conversation
+  // Regular ongoing conversation: fast model
   return 'google/gemini-2.0-flash-001';
 }
 
@@ -1130,13 +1207,13 @@ async function executeActions(db: D1Database, userId: number, actions: any[]): P
             await db.prepare('INSERT INTO life_event_emotions (event_id, emotion, intensity) VALUES (?, ?, ?)').bind(eventId, emo.emotion, emo.intensity || 5).run();
           }
         }
-        await awardXP(db, userId, { lucidity: 5, resonance: 3 }, 'chatbot_life_event', eventId as number, 'Ligne de vie (via Psy IA): ' + action.title);
+        await awardXP(db, userId, { lucidity: 5, resonance: 3 }, 'chatbot_life_event', eventId as number, 'Ligne de vie (via Alma): ' + action.title);
         results.push('life_event:' + action.title);
       }
       else if (action.type === 'add_thought' && action.content) {
         const entryR = await db.prepare(
           'INSERT INTO thought_entries (user_id, content, source_type, ai_analysis) VALUES (?, ?, ?, ?)'
-        ).bind(userId, action.content, 'chatbot', 'Categorise par Mon Psy IA').run();
+        ).bind(userId, action.content, 'chatbot', 'Categorise par Alma').run();
         const entryId = entryR.meta.last_row_id;
         for (const bKey of (action.branches || [])) {
           const branch = await db.prepare('SELECT id FROM thought_branches WHERE user_id = ? AND branch_key = ?').bind(userId, bKey).first() as any;
@@ -1240,7 +1317,7 @@ app.post('/api/chat/send', async (c) => {
   }));
 
   // Build system prompt with full user context
-  const systemPrompt = await buildChatSystemPrompt(db, user.id);
+  const systemPrompt = await buildChatSystemPrompt(db, user.id, conv.messages_count || 0);
 
   // Detect deep content (long messages, emotional keywords)
   const deepKeywords = ['mort', 'trauma', 'deuil', 'suicide', 'deprime', 'abus', 'violence', 'viol', 'abandon', 'divorce', 'rupture', 'angoisse', 'panique'];
@@ -1281,7 +1358,7 @@ app.post('/api/chat/send', async (c) => {
     let xp = null;
     const newCount = (conv.messages_count || 0) + 2;
     if (newCount % 10 === 0) {
-      xp = await awardXP(db, user.id, { resonance: 3, lucidity: 2 }, 'chat', convId as number, 'Discussion avec Mon Psy IA');
+      xp = await awardXP(db, user.id, { resonance: 3, lucidity: 2 }, 'chat', convId as number, 'Discussion avec Alma');
     }
 
     return c.json({
@@ -1590,7 +1667,7 @@ function getAppHTML(): string {
     </div>
     <!-- Desktop tabs -->
     <div class="desktop-tabs max-w-5xl mx-auto px-4 flex gap-1 border-t border-white/5">
-      <button onclick="showTab('chat')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="chat"><i class="fas fa-comments mr-1"></i>Mon Psy IA</button>
+      <button onclick="showTab('chat')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="chat"><i class="fas fa-comments mr-1"></i>Alma</button>
       <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="lifeline"><i class="fas fa-timeline mr-1"></i>Ligne de vie</button>
       <button onclick="showTab('psych')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="psych"><i class="fas fa-user-doctor mr-1"></i>Profil Psy</button>
       <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="thoughttree"><i class="fas fa-sitemap mr-1"></i>Arbre</button>
@@ -1607,7 +1684,7 @@ function getAppHTML(): string {
   <!-- MOBILE BOTTOM NAV -->
   <div class="bottom-nav">
     <div class="flex justify-around items-center px-1 pt-1">
-      <button onclick="showTab('chat')" class="bottom-nav-btn active" data-tab="chat"><i class="fas fa-comments"></i><span>Psy IA</span></button>
+      <button onclick="showTab('chat')" class="bottom-nav-btn active" data-tab="chat"><i class="fas fa-comments"></i><span>Alma</span></button>
       <button onclick="showTab('lifeline')" class="bottom-nav-btn" data-tab="lifeline"><i class="fas fa-timeline"></i><span>Vie</span></button>
       <button onclick="showTab('psych')" class="bottom-nav-btn" data-tab="psych"><i class="fas fa-user-doctor"></i><span>Profil</span></button>
       <button onclick="showTab('thoughttree')" class="bottom-nav-btn" data-tab="thoughttree"><i class="fas fa-sitemap"></i><span>Arbre</span></button>
@@ -1806,7 +1883,7 @@ function getChatTab(): string {
     <div class="flex items-center justify-between mb-2 flex-shrink-0">
       <div class="flex items-center gap-2">
         <div class="w-9 h-9 rounded-full bg-violet-500/30 flex items-center justify-center"><i class="fas fa-brain text-violet-300"></i></div>
-        <div><h2 class="font-bold text-sm">Mon Psy IA</h2><p class="text-[10px] text-gray-400" id="chatStatus">En ligne</p></div>
+        <div><h2 class="font-bold text-sm">Alma <span class="text-[10px] text-violet-400/60 font-normal">ta psy IA</span></h2><p class="text-[10px] text-gray-400" id="chatStatus">En ligne</p></div>
       </div>
       <div class="flex items-center gap-2">
         <button onclick="loadConversationHistory()" class="text-gray-400 hover:text-white text-sm p-1.5" title="Historique"><i class="fas fa-clock-rotate-left"></i></button>
@@ -1825,8 +1902,9 @@ function getChatTab(): string {
       <div class="flex gap-2">
         <div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div>
         <div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]">
-          <p class="text-xs text-gray-300 leading-relaxed">Salut ! Je suis <span class="text-violet-300 font-medium">Mon Psy IA</span>, ton compagnon de route dans Hack Ton Esprit. Je suis la pour t'ecouter, t'aider a comprendre tes schemas de pensee et construire ton profil psychologique.</p>
-          <p class="text-xs text-gray-300 leading-relaxed mt-2">Comment te sens-tu aujourd'hui ?</p>
+          <p class="text-xs text-gray-300 leading-relaxed">Salut ! Moi c'est <span class="text-violet-300 font-medium">Alma</span>. Je suis ta psy IA dans Hack Ton Esprit.</p>
+          <p class="text-xs text-gray-300 leading-relaxed mt-2">Mon objectif ? Te comprendre en profondeur — tes schemas de pensee, tes reactions, ce qui te bloque, ce qui te fait avancer. Plus on discute, mieux je te connais.</p>
+          <p class="text-xs text-gray-300 leading-relaxed mt-2">Pour commencer, dis-moi : comment tu t'appelles et qu'est-ce qui t'amene ici ?</p>
         </div>
       </div>
     </div>
@@ -2117,7 +2195,7 @@ async function loadChatMessages(convId){
   let h=el.innerHTML.split('</div>\\n    </div>')[0];
   h=''; // Clear and rebuild
   // Welcome message
-  h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">Salut ! Je suis <span class="text-violet-300 font-medium">Mon Psy IA</span>. On reprend notre conversation ?</p></div></div>';
+  h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">On se retrouve ! C'est Alma. Prete a continuer ?</p></div></div>';
   for(const m of (d.messages||[])){
     if(m.role==='user'){h+='<div class="flex gap-2 justify-end"><div class="bg-violet-600/30 border border-violet-500/20 rounded-xl rounded-tr-sm p-3 max-w-[85%]"><p class="text-xs text-white leading-relaxed">'+escapeHtml(m.content)+'</p></div></div>'}
     else{h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(m.content)+'</p></div></div>'}
