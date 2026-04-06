@@ -1301,118 +1301,177 @@ function getMainHTML(): string {
 }
 
 // ============================================
-// HTML — APP DASHBOARD
+// HTML — APP DASHBOARD (v3 — Refactored Navigation)
 // ============================================
 function getAppHTML(): string {
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hack Ton Esprit — Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hack Ton Esprit</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-    body{font-family:'Inter',sans-serif}
-    .gradient-bg{background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)}
-    .glow{text-shadow:0 0 20px rgba(139,92,246,.5)}
-    .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+    *{font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent}
+    .gradient-bg{background:linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%);min-height:100vh;min-height:100dvh}
+    .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);transition:all .2s}
     .card:hover{background:rgba(255,255,255,.08);border-color:rgba(139,92,246,.3)}
     .card-glow{box-shadow:0 0 30px rgba(139,92,246,.1)}
-    .capture-btn{position:fixed;bottom:24px;right:24px;z-index:40;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);box-shadow:0 4px 20px rgba(139,92,246,.4);transition:all .3s}
-    .capture-btn:hover{transform:scale(1.1)}
     .stat-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}
     .stat-fill{height:100%;border-radius:4px;transition:width 1s ease-out}
-    .tab-active{border-bottom:2px solid #8b5cf6;color:#c4b5fd}
-    .modal-overlay{background:rgba(0,0,0,.8);backdrop-filter:blur(8px)}
+    .modal-overlay{background:rgba(0,0,0,.85);backdrop-filter:blur(12px)}
     .toast{animation:slideUp .3s ease-out}
     @keyframes slideUp{from{transform:translateY(100px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .fade-in{animation:fadeIn .4s ease-out}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
     .emotion-chip{cursor:pointer;transition:all .2s}
     .emotion-chip:hover{transform:scale(1.05)}
-    .emotion-chip.selected{background:rgba(139,92,246,.3);border-color:#8b5cf6}
-    .fade-in{animation:fadeIn .5s ease-out}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    .timeline-line{position:absolute;left:50%;width:2px;background:rgba(139,92,246,.3);top:0;bottom:0;transform:translateX(-50%)}
-    .intensity-dot{width:12px;height:12px;border-radius:50%;display:inline-block}
+    .emotion-chip.selected{background:rgba(139,92,246,.3)!important;border-color:#8b5cf6!important}
+    /* Bottom nav for mobile */
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(15,12,41,.95);backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.1);padding-bottom:env(safe-area-inset-bottom)}
+    .bottom-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;font-size:10px;color:rgba(156,163,175,1);transition:all .2s;flex:1;min-width:0}
+    .bottom-nav-btn.active{color:#c4b5fd}
+    .bottom-nav-btn.active i{color:#a78bfa}
+    .bottom-nav-btn i{font-size:18px;transition:all .2s}
+    /* Locked feature card */
+    .locked-card{position:relative;overflow:hidden}
+    .locked-card::after{content:'';position:absolute;inset:0;background:rgba(15,12,41,.7);backdrop-filter:blur(2px);z-index:1}
+    .locked-card .lock-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;text-align:center;padding:12px}
+    /* Capture FAB */
+    .capture-fab{position:fixed;z-index:35;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);box-shadow:0 4px 20px rgba(139,92,246,.5);transition:all .3s;bottom:calc(72px + env(safe-area-inset-bottom));right:16px}
+    .capture-fab:hover{transform:scale(1.1)}
+    @media(min-width:768px){.capture-fab{bottom:24px;right:24px}}
+    /* Section headers */
+    .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(156,163,175,.7);margin-bottom:12px;padding-left:4px}
+    /* XP ring */
+    .xp-ring{position:relative;width:64px;height:64px}
+    .xp-ring svg{transform:rotate(-90deg)}
+    .xp-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    /* Scrollbar */
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(139,92,246,.3);border-radius:4px}
+    /* Safe bottom padding for content */
+    .safe-bottom{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+    @media(min-width:768px){.safe-bottom{padding-bottom:32px}}
+    /* Desktop top tabs */
+    @media(max-width:767px){.desktop-tabs{display:none!important}}
+    @media(min-width:768px){.bottom-nav{display:none!important}}
   </style>
 </head>
-<body class="gradient-bg min-h-screen text-white">
-  <nav class="sticky top-0 z-30 bg-gray-900/80 backdrop-blur-md border-b border-white/10">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3"><span class="text-2xl">&#129504;</span><span class="font-bold text-lg hidden sm:block">Hack Ton Esprit</span></div>
-      <div class="flex items-center gap-4">
-        <div id="streakBadge" class="flex items-center gap-1 px-3 py-1 bg-orange-500/20 rounded-full text-orange-300 text-sm"><i class="fas fa-fire"></i><span id="streakCount">0</span></div>
-        <div id="levelBadge" class="flex items-center gap-1 px-3 py-1 bg-violet-500/20 rounded-full text-violet-300 text-sm"><i class="fas fa-star"></i><span id="globalLevel">Nv. 1</span></div>
-        <button onclick="logout()" class="text-gray-400 hover:text-white" title="Deconnexion"><i class="fas fa-sign-out-alt"></i></button>
+<body class="gradient-bg text-white">
+  <!-- TOP BAR -->
+  <nav class="sticky top-0 z-30 bg-gray-900/90 backdrop-blur-md border-b border-white/10">
+    <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center gap-2"><span class="text-xl">&#129504;</span><span class="font-bold text-sm sm:text-base">Hack Ton Esprit</span></div>
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-1 px-2.5 py-1 bg-orange-500/20 rounded-full text-orange-300 text-xs"><i class="fas fa-fire text-[10px]"></i><span id="streakCount">0</span></div>
+        <div id="xpBadge" class="flex items-center gap-1 px-2.5 py-1 bg-violet-500/20 rounded-full text-violet-300 text-xs cursor-pointer" onclick="showTab('dashboard')"><i class="fas fa-star text-[10px]"></i><span id="globalLevel">Nv.1</span></div>
+        <button onclick="logout()" class="text-gray-500 hover:text-white text-sm p-1" title="Deconnexion"><i class="fas fa-sign-out-alt"></i></button>
       </div>
+    </div>
+    <!-- Desktop tabs -->
+    <div class="desktop-tabs max-w-5xl mx-auto px-4 flex gap-1 border-t border-white/5">
+      <button onclick="showTab('dashboard')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="dashboard"><i class="fas fa-home mr-1"></i>Accueil</button>
+      <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="lifeline"><i class="fas fa-timeline mr-1"></i>Ligne de vie</button>
+      <button onclick="showTab('habits')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="habits"><i class="fas fa-list-check mr-1"></i>Habitudes</button>
+      <button onclick="showTab('video')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="video"><i class="fas fa-video mr-1"></i>Video</button>
+      <button onclick="showTab('psych')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="psych"><i class="fas fa-user-doctor mr-1"></i>Profil Psy</button>
+      <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="thoughttree"><i class="fas fa-sitemap mr-1"></i>Arbre</button>
     </div>
   </nav>
 
-  <div class="max-w-6xl mx-auto px-4">
-    <div class="flex gap-1 overflow-x-auto py-3 border-b border-white/10 text-sm" id="tabBar">
-      <button onclick="showTab('dashboard')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="dashboard"><i class="fas fa-home mr-1"></i>Accueil</button>
-      <button onclick="showTab('morning')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="morning"><i class="fas fa-sun mr-1"></i>Matin</button>
-      <button onclick="showTab('evening')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="evening"><i class="fas fa-moon mr-1"></i>Soir</button>
-      <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="lifeline"><i class="fas fa-timeline mr-1"></i>Ligne de vie</button>
-      <button onclick="showTab('habits')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="habits"><i class="fas fa-list-check mr-1"></i>Habitudes</button>
-      <button onclick="showTab('weekly')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="weekly"><i class="fas fa-calendar-week mr-1"></i>Hebdo</button>
-      <button onclick="showTab('video')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="video"><i class="fas fa-video mr-1"></i>Video</button>
-      <button onclick="showTab('psych')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="psych"><i class="fas fa-user-doctor mr-1"></i>Profil Psy</button>
-      <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="thoughttree"><i class="fas fa-sitemap mr-1"></i>Arbre</button>
-      <button onclick="showTab('patterns')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="patterns"><i class="fas fa-brain mr-1"></i>Patterns</button>
-      <button onclick="showTab('quests')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="quests"><i class="fas fa-scroll mr-1"></i>Quetes</button>
-      <button onclick="showTab('rituals')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="rituals"><i class="fas fa-gem mr-1"></i>Rituels</button>
-      <button onclick="showTab('history')" class="tab-btn px-3 py-2 rounded-lg whitespace-nowrap text-gray-400 hover:text-white transition-all" data-tab="history"><i class="fas fa-chart-line mr-1"></i>Stats</button>
-    </div>
-  </div>
-
-  <main class="max-w-6xl mx-auto px-4 py-6 pb-24">
-` + getDashboardTab() + getMorningTab() + getEveningTab() + getLifelineTab() + getHabitsTab() + getWeeklyTab() + getVideoTab() + getPsychTab() + getThoughtTreeTab() + getPatternsTab() + getQuestsTab() + getRitualsTab() + getHistoryTab() + `
+  <!-- MAIN CONTENT -->
+  <main class="max-w-5xl mx-auto px-4 py-4 safe-bottom">
+` + getAllTabsHTML() + `
   </main>
 
-  <button onclick="openCapture()" class="capture-btn flex items-center justify-center text-white text-2xl" title="Capture instantanee"><i class="fas fa-bolt"></i></button>
-
-  <!-- Modals -->
-  <div id="captureModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-md border border-violet-500/30">
-      <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-violet-300"><i class="fas fa-bolt mr-2"></i>Capture</h3><button onclick="closeCapture()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button></div>
-      <textarea id="captureContent" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:border-violet-500 focus:outline-none resize-none" rows="4" placeholder="Ce qui se passe en moi..."></textarea>
-      <div class="flex items-center gap-3 mt-3 mb-4"><label class="text-sm text-gray-400">Intensite:</label><input type="range" id="captureIntensity" min="1" max="10" value="5" class="flex-1 accent-violet-500" oninput="document.getElementById('captureIntVal').textContent=this.value"><span id="captureIntVal" class="text-violet-400 text-sm">5</span></div>
-      <button onclick="submitCapture()" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold transition-all"><i class="fas fa-bolt mr-2"></i>Capturer</button>
+  <!-- MOBILE BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="flex justify-around items-center px-1 pt-1">
+      <button onclick="showTab('dashboard')" class="bottom-nav-btn active" data-tab="dashboard"><i class="fas fa-home"></i><span>Accueil</span></button>
+      <button onclick="showTab('lifeline')" class="bottom-nav-btn" data-tab="lifeline"><i class="fas fa-timeline"></i><span>Vie</span></button>
+      <button onclick="showTab('habits')" class="bottom-nav-btn" data-tab="habits"><i class="fas fa-list-check"></i><span>Habitudes</span></button>
+      <button onclick="showTab('video')" class="bottom-nav-btn" data-tab="video"><i class="fas fa-video"></i><span>Video</span></button>
+      <button onclick="showTab('psych')" class="bottom-nav-btn" data-tab="psych"><i class="fas fa-user-doctor"></i><span>Profil</span></button>
+      <button onclick="showTab('thoughttree')" class="bottom-nav-btn" data-tab="thoughttree"><i class="fas fa-sitemap"></i><span>Arbre</span></button>
     </div>
   </div>
 
-  <div id="weeklyModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-start justify-center p-4 overflow-y-auto">
-    <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-lg border border-violet-500/30 my-8">
-      <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-violet-300" id="weeklyTitle"></h3><button onclick="closeWeeklyModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+  <!-- CAPTURE FAB -->
+  <button onclick="openCapture()" class="capture-fab flex items-center justify-center text-white text-xl" title="Capture instantanee"><i class="fas fa-bolt"></i></button>
+
+  <!-- MODALS -->
+  <div id="captureModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-md border-t sm:border border-violet-500/30">
+      <div class="flex items-center justify-between mb-3"><h3 class="text-base font-bold text-violet-300"><i class="fas fa-bolt mr-2"></i>Capture instantanee</h3><button onclick="closeCapture()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
+      <textarea id="captureContent" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="3" placeholder="Ce qui se passe en moi..."></textarea>
+      <div class="flex items-center gap-3 mt-2 mb-3"><label class="text-xs text-gray-400">Intensite:</label><input type="range" id="captureIntensity" min="1" max="10" value="5" class="flex-1 accent-violet-500" oninput="document.getElementById('captureIntVal').textContent=this.value"><span id="captureIntVal" class="text-violet-400 text-xs font-bold">5</span></div>
+      <button onclick="submitCapture()" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold text-sm transition-all"><i class="fas fa-bolt mr-2"></i>Capturer</button>
+    </div>
+  </div>
+
+  <div id="weeklyModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-start justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-lg border-t sm:border border-violet-500/30 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h3 class="text-base font-bold text-violet-300" id="weeklyTitle"></h3><button onclick="closeWeeklyModal()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
       <div id="weeklyContent"></div>
     </div>
   </div>
 
-  <div id="questModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-start justify-center p-4 overflow-y-auto">
-    <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-lg border border-violet-500/30 my-8">
-      <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-violet-300" id="questTitle"></h3><button onclick="closeQuestModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+  <div id="questModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-start justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-lg border-t sm:border border-violet-500/30 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h3 class="text-base font-bold text-violet-300" id="questTitle"></h3><button onclick="closeQuestModal()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
       <div id="questContent"></div>
     </div>
   </div>
 
-  <div id="selfDeclareModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-start justify-center p-4 overflow-y-auto">
-    <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-lg border border-violet-500/30 my-8">
-      <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-violet-300"><i class="fas fa-hand-point-up mr-2"></i>Autodeclarer un pattern</h3><button onclick="closeSelfDeclare()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+  <div id="selfDeclareModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-start justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-lg border-t sm:border border-violet-500/30 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h3 class="text-base font-bold text-violet-300"><i class="fas fa-hand-point-up mr-2"></i>Autodeclarer un pattern</h3><button onclick="closeSelfDeclare()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
       <div id="selfDeclareContent" class="space-y-3"></div>
     </div>
   </div>
 
-  <div id="lifeEventModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-start justify-center p-4 overflow-y-auto">
-    <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-lg border border-violet-500/30 my-8">
-      <div class="flex items-center justify-between mb-4"><h3 class="text-lg font-bold text-violet-300" id="lifeEventTitle"><i class="fas fa-timeline mr-2"></i>Evenement de vie</h3><button onclick="closeLifeEventModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button></div>
+  <div id="lifeEventModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-start justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-lg border-t sm:border border-violet-500/30 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h3 class="text-base font-bold text-violet-300" id="lifeEventTitle"><i class="fas fa-timeline mr-2"></i>Evenement de vie</h3><button onclick="closeLifeEventModal()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
       <div id="lifeEventContent"></div>
     </div>
   </div>
 
-  <div id="toast" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 hidden z-50">
-    <div class="toast bg-gray-900 border border-violet-500/30 rounded-xl px-6 py-3 flex items-center gap-3 shadow-2xl"><span id="toastIcon" class="text-xl"></span><span id="toastMsg" class="text-sm"></span></div>
+  <!-- Morning Modal -->
+  <div id="morningModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-start justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-lg border-t sm:border border-amber-500/30 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h3 class="text-base font-bold text-amber-300"><i class="fas fa-sun mr-2"></i>Check-in du matin</h3><button onclick="closeMorningModal()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
+      <p class="text-xs text-gray-400 mb-4">Comment te sens-tu ce matin ? (2 min)</p>
+      <div id="morningForm">
+        <div class="mb-4"><label class="block text-xs font-medium text-gray-300 mb-2">Emotion</label><div id="emotionWheel" class="space-y-2 max-h-48 overflow-y-auto"></div><input type="hidden" id="selectedEmotion" value=""></div>
+        <div class="mb-4"><label class="block text-xs font-medium text-gray-300 mb-1">Precise (optionnel)</label><textarea id="emotionDetail" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Pourquoi tu te sens comme ca..."></textarea></div>
+        <div class="mb-4"><label class="block text-xs font-medium text-gray-300 mb-1">Energie: <span id="energyValue" class="text-violet-400">5</span>/10</label><input type="range" id="energyLevel" min="1" max="10" value="5" class="w-full accent-violet-500" oninput="document.getElementById('energyValue').textContent=this.value"></div>
+        <div class="mb-4"><label class="block text-xs font-medium text-gray-300 mb-1">Intention du jour</label><input type="text" id="intention" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="patience, avancer, ecouter..."></div>
+        <button onclick="submitMorningCheckin()" class="w-full py-3 bg-amber-600 hover:bg-amber-500 rounded-xl font-bold text-sm transition-all"><i class="fas fa-check mr-2"></i>Valider le check-in</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evening Modal -->
+  <div id="eveningModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-start justify-center p-0 sm:p-4 overflow-y-auto">
+    <div class="bg-gray-900 rounded-t-2xl sm:rounded-2xl p-5 w-full sm:max-w-lg border-t sm:border border-indigo-500/30 sm:my-8 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h3 class="text-base font-bold text-indigo-300"><i class="fas fa-moon mr-2"></i>Scan du soir</h3><button onclick="closeEveningModal()" class="text-gray-400 hover:text-white p-1"><i class="fas fa-times"></i></button></div>
+      <p class="text-xs text-gray-400 mb-4">3 micro-exercices, fais-en au moins 1 (5 min)</p>
+      <div id="eveningForm">
+        <div class="card rounded-xl p-4 mb-3"><h4 class="font-semibold text-sm mb-2"><i class="fas fa-trophy text-amber-400 mr-2"></i>3 micro-victoires</h4><input type="text" id="victory1" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Victoire 1..."><input type="text" id="victory2" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Victoire 2..."><input type="text" id="victory3" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Victoire 3..."></div>
+        <div class="card rounded-xl p-4 mb-3"><h4 class="font-semibold text-sm mb-2"><i class="fas fa-eye text-green-400 mr-2"></i>Gratitude invisible</h4><textarea id="gratitude" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Ce dont je suis reconnaissant(e)..."></textarea></div>
+        <div class="card rounded-xl p-4 mb-4"><h4 class="font-semibold text-sm mb-2"><i class="fas fa-heart text-red-400 mr-2"></i>Emotion forte</h4><input type="text" id="strongEmotion" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="L'emotion..."><textarea id="emotionTrigger" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Son declencheur..."></textarea></div>
+        <button onclick="submitEveningCheckin()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-sm transition-all"><i class="fas fa-moon mr-2"></i>Enregistrer le scan</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-20 sm:bottom-8 left-1/2 transform -translate-x-1/2 hidden z-50">
+    <div class="toast bg-gray-900 border border-violet-500/30 rounded-xl px-5 py-2.5 flex items-center gap-2 shadow-2xl"><span id="toastIcon" class="text-lg"></span><span id="toastMsg" class="text-xs"></span></div>
   </div>
 
   <script>
@@ -1423,173 +1482,145 @@ function getAppHTML(): string {
 }
 
 // ============================================
-// TAB FRAGMENTS
+// TAB FRAGMENTS (v3 — Unified)
 // ============================================
+function getAllTabsHTML(): string {
+  return getDashboardTab() + getLifelineTab() + getHabitsTab() + getVideoTab() + getPsychTab() + getThoughtTreeTab();
+}
+
 function getDashboardTab(): string {
   return `<div id="tab-dashboard" class="tab-content fade-in">
-  <div class="mb-6"><h2 class="text-2xl font-bold mb-1">Bonjour, <span id="userName"></span> &#128075;</h2><p class="text-gray-400" id="awakeningTitle"></p></div>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-    <div id="morningCard" class="card rounded-2xl p-5 cursor-pointer transition-all" onclick="showTab('morning')"><div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center"><i class="fas fa-sun text-amber-400"></i></div><div><h3 class="font-semibold">Check-in matin</h3><p class="text-xs text-gray-400" id="morningStatus">En attente...</p></div></div><div class="text-xs text-violet-300">+5 XP Resonance</div></div>
-    <div id="eveningCard" class="card rounded-2xl p-5 cursor-pointer transition-all" onclick="showTab('evening')"><div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center"><i class="fas fa-moon text-indigo-400"></i></div><div><h3 class="font-semibold">Scan du soir</h3><p class="text-xs text-gray-400" id="eveningStatus">En attente...</p></div></div><div class="text-xs text-violet-300">+5 a +15 XP</div></div>
-    <div class="card rounded-2xl p-5 cursor-pointer transition-all" onclick="openCapture()"><div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center"><i class="fas fa-bolt text-purple-400"></i></div><div><h3 class="font-semibold">Capture instantanee</h3><p class="text-xs text-gray-400" id="captureCount">0 captures</p></div></div><div class="text-xs text-violet-300">+2 XP Lucidite</div></div>
+  <!-- Header with XP ring -->
+  <div class="flex items-center gap-4 mb-5">
+    <div class="xp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3"/><circle id="xpCircle" cx="18" cy="18" r="16" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="0 100" stroke-linecap="round"/></svg><div class="xp-ring-text"><span id="globalLevelNum" class="text-sm font-black text-violet-300">1</span><span class="text-[8px] text-gray-500 uppercase">Niveau</span></div></div>
+    <div class="flex-1 min-w-0"><h2 class="text-lg font-bold truncate">Salut, <span id="userName"></span></h2><p class="text-xs text-gray-400 truncate" id="awakeningTitle"></p><div class="stat-bar mt-2"><div id="xpBar" class="stat-fill bg-violet-500" style="width:0%"></div></div><p class="text-[10px] text-gray-500 mt-1"><span id="xpCurrent">0</span> / <span id="xpNext">100</span> XP</p></div>
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-    <div class="card rounded-2xl p-5 cursor-pointer" onclick="showTab('lifeline')"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center"><i class="fas fa-timeline text-cyan-400"></i></div><div><h3 class="font-semibold">Ligne de vie</h3><p class="text-xs text-gray-400"><span id="lifeEventsCount">0</span> evenements</p></div><div class="text-xs text-violet-300 ml-auto">+10 XP</div></div></div>
-    <div class="card rounded-2xl p-5 cursor-pointer" onclick="showTab('habits')"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center"><i class="fas fa-list-check text-emerald-400"></i></div><div><h3 class="font-semibold">Micro-habitudes</h3><p class="text-xs text-gray-400"><span id="habitsCount">0</span> actives</p></div><div class="text-xs text-violet-300 ml-auto">+3 XP/jour</div></div></div>
+
+  <!-- SECTION: Quotidien (Nv.1) — Always visible -->
+  <div class="section-title flex items-center gap-2"><i class="fas fa-sun text-amber-400 text-[11px]"></i>Quotidien</div>
+  <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+    <div id="morningCard" class="card rounded-xl p-3 cursor-pointer" onclick="openMorningModal()"><div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-sm"><i class="fas fa-sun text-amber-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Check-in matin</h3><p class="text-[10px] text-gray-500" id="morningStatus">En attente</p></div></div><div class="text-[10px] text-violet-300">+5 XP</div></div>
+    <div id="eveningCard" class="card rounded-xl p-3 cursor-pointer" data-unlock="2" onclick="handleLockedClick(2,'evening')"><div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-sm"><i class="fas fa-moon text-indigo-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Scan du soir</h3><p class="text-[10px] text-gray-500" id="eveningStatus">En attente</p></div></div><div class="text-[10px] text-violet-300">+5-15 XP</div></div>
+    <div class="card rounded-xl p-3 cursor-pointer" onclick="openCapture()"><div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-sm"><i class="fas fa-bolt text-purple-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Capture</h3><p class="text-[10px] text-gray-500" id="captureCount">0</p></div></div><div class="text-[10px] text-violet-300">+2 XP</div></div>
   </div>
-  <h3 class="text-lg font-bold mb-4"><i class="fas fa-chart-bar mr-2 text-violet-400"></i>Stats</h3>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-8" id="statsGrid"></div>
+
+  <!-- SECTION: Hebdomadaire (Nv.3) -->
+  <div class="section-title flex items-center gap-2"><i class="fas fa-calendar-week text-blue-400 text-[11px]"></i>Hebdomadaire <span id="weeklyLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div id="weeklySection" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="3" onclick="handleLockedClick(3,'decontamination')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-base">&#129529;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Decontamination</h3><p class="text-[10px] text-gray-500">15 min</p></div><span class="text-[10px] text-violet-300">+30 XP</span></div></div>
+    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="3" onclick="handleLockedClick(3,'influence')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-base">&#127919;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Cercle d'influence</h3><p class="text-[10px] text-gray-500">10 min</p></div><span class="text-[10px] text-violet-300">+25 XP</span></div></div>
+    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="3" onclick="handleLockedClick(3,'worry')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-base">&#128230;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Boite a soucis</h3><p class="text-[10px] text-gray-500">10 min</p></div><span class="text-[10px] text-violet-300">+25 XP</span></div></div>
+  </div>
+
+  <!-- SECTION: Patterns & Quetes (Nv.4+) -->
+  <div class="section-title flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-[11px]"></i>Patterns & Quetes <span id="patternsLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div id="patternsSection" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="4" onclick="handleLockedClick(4,'patterns')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center text-sm"><i class="fas fa-brain text-pink-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Mes patterns</h3><p class="text-[10px] text-gray-500" id="patternCount">0 detectes</p></div><span class="text-[10px] text-violet-300"><i class="fas fa-chevron-right"></i></span></div></div>
+    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="4" onclick="handleLockedClick(4,'quests')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-sm"><i class="fas fa-scroll text-violet-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Quetes actives</h3><p class="text-[10px] text-gray-500" id="questCount">0 disponibles</p></div><span class="text-[10px] text-violet-300"><i class="fas fa-chevron-right"></i></span></div></div>
+  </div>
+
+  <!-- SECTION: Rituels (Nv.5) -->
+  <div class="section-title flex items-center gap-2"><i class="fas fa-gem text-emerald-400 text-[11px]"></i>Rituels <span id="ritualsLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div id="ritualsSection" class="mb-6">
+    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="5" onclick="handleLockedClick(5,'rituals')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-sm"><i class="fas fa-gem text-emerald-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Introspections profondes</h3><p class="text-[10px] text-gray-500" id="ritualInfo">Mensuel, trimestriel, annuel</p></div><span class="text-[10px] text-violet-300"><i class="fas fa-chevron-right"></i></span></div></div>
+  </div>
+
+  <!-- SECTION: Stats (Nv.3) -->
+  <div class="section-title flex items-center gap-2"><i class="fas fa-chart-bar text-cyan-400 text-[11px]"></i>Progression <span id="statsLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div id="statsSection">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4" id="statsGrid"></div>
+    <div id="historyPreview" class="card rounded-xl p-4 hidden" data-unlock="3"><h4 class="text-xs font-semibold text-gray-300 mb-3"><i class="fas fa-clock mr-1"></i>Activite recente</h4><div id="recentActivity" class="space-y-2"></div></div>
+  </div>
 </div>`;
 }
 
-function getMorningTab(): string {
-  return `<div id="tab-morning" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-2"><i class="fas fa-sun text-amber-400 mr-2"></i>Check-in du matin</h2><p class="text-gray-400 mb-6">Comment te sens-tu ? (2 min)</p>
-  <div id="morningForm">
-    <div class="mb-6"><label class="block text-sm font-medium text-gray-300 mb-3">Comment te sens-tu ?</label><div id="emotionWheel" class="space-y-3"></div><input type="hidden" id="selectedEmotion" value=""></div>
-    <div class="mb-6"><label class="block text-sm font-medium text-gray-300 mb-2">Precise (facultatif)</label><textarea id="emotionDetail" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Pourquoi tu te sens comme ca..."></textarea></div>
-    <div class="mb-6"><label class="block text-sm font-medium text-gray-300 mb-2">Energie: <span id="energyValue" class="text-violet-400">5</span>/10</label><input type="range" id="energyLevel" min="1" max="10" value="5" class="w-full accent-violet-500" oninput="document.getElementById('energyValue').textContent=this.value"></div>
-    <div class="mb-6"><label class="block text-sm font-medium text-gray-300 mb-2">Intention du jour</label><input type="text" id="intention" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:border-violet-500 focus:outline-none" placeholder="patience, avancer, ecouter..."></div>
-    <button onclick="submitMorningCheckin()" class="w-full py-4 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold text-lg transition-all"><i class="fas fa-check mr-2"></i>Valider</button>
-  </div>
-  <div id="morningDone" class="hidden text-center py-12"><div class="text-6xl mb-4">&#9989;</div><h3 class="text-2xl font-bold text-green-400 mb-2">Check-in enregistre !</h3><p class="text-gray-400">+5 XP Resonance</p></div>
-</div></div>`;
-}
-
-function getEveningTab(): string {
-  return `<div id="tab-evening" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-2"><i class="fas fa-moon text-indigo-400 mr-2"></i>Scan du soir</h2><p class="text-gray-400 mb-6">3 micro-exercices, fais-en au moins 1 (5 min)</p>
-  <div id="eveningForm">
-    <div class="card rounded-2xl p-5 mb-4"><h3 class="font-semibold mb-3"><i class="fas fa-trophy text-amber-400 mr-2"></i>3 micro-victoires</h3><input type="text" id="victory1" class="w-full px-4 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="Victoire 1..."><input type="text" id="victory2" class="w-full px-4 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="Victoire 2..."><input type="text" id="victory3" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="Victoire 3..."></div>
-    <div class="card rounded-2xl p-5 mb-4"><h3 class="font-semibold mb-3"><i class="fas fa-eye text-green-400 mr-2"></i>1 gratitude invisible</h3><textarea id="gratitude" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Ce dont je suis reconnaissant(e)..."></textarea></div>
-    <div class="card rounded-2xl p-5 mb-6"><h3 class="font-semibold mb-3"><i class="fas fa-heart text-red-400 mr-2"></i>1 emotion forte</h3><input type="text" id="strongEmotion" class="w-full px-4 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="L'emotion..."><textarea id="emotionTrigger" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Son declencheur..."></textarea></div>
-    <button onclick="submitEveningCheckin()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-lg transition-all"><i class="fas fa-moon mr-2"></i>Enregistrer</button>
-  </div>
-  <div id="eveningDone" class="hidden text-center py-12"><div class="text-6xl mb-4">&#127769;</div><h3 class="text-2xl font-bold text-indigo-400 mb-2">Scan enregistre !</h3><p class="text-gray-400">Bonne nuit.</p></div>
-</div></div>`;
-}
+// Morning & Evening are now modals (defined in getAppHTML), no separate tabs needed
 
 function getLifelineTab(): string {
-  return `<div id="tab-lifeline" class="tab-content hidden fade-in"><div class="max-w-3xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
-    <div><h2 class="text-2xl font-bold"><i class="fas fa-timeline text-cyan-400 mr-2"></i>Ligne de vie</h2><p class="text-gray-400 text-sm">Tes evenements majeurs</p></div>
-    <button onclick="openLifeEventForm()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-medium text-sm transition-all"><i class="fas fa-plus mr-1"></i>Ajouter</button>
+  return `<div id="tab-lifeline" class="tab-content hidden fade-in">
+  <div class="flex items-center justify-between mb-4">
+    <div><h2 class="text-lg font-bold"><i class="fas fa-timeline text-cyan-400 mr-2"></i>Ligne de vie</h2><p class="text-xs text-gray-400">Tes evenements majeurs</p></div>
+    <button onclick="openLifeEventForm()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-xs transition-all"><i class="fas fa-plus mr-1"></i>Ajouter</button>
   </div>
-  <div id="onboardingPrompt" class="hidden card rounded-2xl p-6 mb-6 border-cyan-500/30">
-    <h3 class="font-bold text-cyan-300 mb-2"><i class="fas fa-info-circle mr-2"></i>Commence par 10 evenements</h3>
-    <p class="text-sm text-gray-400 mb-3">Pour construire ta ligne de vie, ajoute les 10 evenements les plus importants de ta vie. Bonus XP au 10eme !</p>
-    <div class="flex items-center gap-2"><div class="stat-bar flex-1"><div id="onboardingProgress" class="stat-fill bg-cyan-500" style="width:0%"></div></div><span id="onboardingCount" class="text-sm text-cyan-300">0/10</span></div>
+  <div id="onboardingPrompt" class="hidden card rounded-xl p-4 mb-4 border-cyan-500/20">
+    <h3 class="font-bold text-cyan-300 text-sm mb-1"><i class="fas fa-info-circle mr-1"></i>Commence par 10 evenements</h3>
+    <p class="text-xs text-gray-400 mb-2">Ajoute les 10 moments cles. Bonus XP au 10eme !</p>
+    <div class="flex items-center gap-2"><div class="stat-bar flex-1"><div id="onboardingProgress" class="stat-fill bg-cyan-500" style="width:0%"></div></div><span id="onboardingCount" class="text-xs text-cyan-300">0/10</span></div>
   </div>
-  <div id="lifelineContent" class="space-y-4"></div>
-</div></div>`;
+  <div id="lifelineContent" class="space-y-3"></div>
+</div>`;
 }
 
 function getHabitsTab(): string {
-  return `<div id="tab-habits" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
-    <div><h2 class="text-2xl font-bold"><i class="fas fa-list-check text-emerald-400 mr-2"></i>Micro-habitudes</h2><p class="text-gray-400 text-sm">Accumule des habitudes, une par semaine</p></div>
-    <button onclick="openAddHabit()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-medium text-sm transition-all"><i class="fas fa-plus mr-1"></i>Nouvelle</button>
+  return `<div id="tab-habits" class="tab-content hidden fade-in">
+  <div class="flex items-center justify-between mb-4">
+    <div><h2 class="text-lg font-bold"><i class="fas fa-list-check text-emerald-400 mr-2"></i>Micro-habitudes</h2><p class="text-xs text-gray-400">Accumule des habitudes, une par semaine</p></div>
+    <button onclick="openAddHabit()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-medium text-xs transition-all"><i class="fas fa-plus mr-1"></i>Nouvelle</button>
   </div>
-  <div id="habitsContent" class="space-y-3"></div>
-  <div id="addHabitForm" class="hidden card rounded-2xl p-5 mt-4">
-    <h3 class="font-semibold mb-3">Nouvelle micro-habitude</h3>
-    <input type="text" id="newHabitName" class="w-full px-4 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="Nom de l'habitude">
-    <textarea id="newHabitDesc" class="w-full px-4 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Description (optionnel)"></textarea>
-    <select id="newHabitFreq" class="w-full px-4 py-2 mb-3 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"><option value="daily">Quotidienne</option><option value="weekly">Hebdomadaire</option></select>
-    <button onclick="submitNewHabit()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold text-sm transition-all">Ajouter</button>
+  <div id="habitsContent" class="space-y-2"></div>
+  <div id="addHabitForm" class="hidden card rounded-xl p-4 mt-3">
+    <h3 class="font-semibold text-sm mb-2">Nouvelle micro-habitude</h3>
+    <input type="text" id="newHabitName" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Nom de l'habitude">
+    <textarea id="newHabitDesc" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Description (optionnel)"></textarea>
+    <select id="newHabitFreq" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs"><option value="daily">Quotidienne</option><option value="weekly">Hebdomadaire</option></select>
+    <button onclick="submitNewHabit()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-bold text-xs transition-all">Ajouter</button>
   </div>
-</div></div>`;
+</div>`;
 }
 
-function getWeeklyTab(): string {
-  return `<div id="tab-weekly" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-6"><i class="fas fa-calendar-week text-violet-400 mr-2"></i>Exercices hebdomadaires</h2>
-  <div class="space-y-4">
-    <div class="card rounded-2xl p-5 cursor-pointer" onclick="openWeeklyExercise('decontamination')"><div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center text-2xl">&#129529;</div><div class="flex-1"><h3 class="font-semibold">La Decontamination</h3><p class="text-sm text-gray-400">15 min</p></div><div class="text-xs text-violet-300">+30 XP</div></div></div>
-    <div class="card rounded-2xl p-5 cursor-pointer" onclick="openWeeklyExercise('influence')"><div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">&#127919;</div><div class="flex-1"><h3 class="font-semibold">Cercle d'influence</h3><p class="text-sm text-gray-400">10 min</p></div><div class="text-xs text-violet-300">+25 XP</div></div></div>
-    <div class="card rounded-2xl p-5 cursor-pointer" onclick="openWeeklyExercise('worry')"><div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center text-2xl">&#128230;</div><div class="flex-1"><h3 class="font-semibold">Boite a soucis</h3><p class="text-sm text-gray-400">10 min</p></div><div class="text-xs text-violet-300">+25 XP</div></div></div>
-  </div>
-</div></div>`;
-}
+// Weekly is now integrated into dashboard, no separate tab
 
 function getVideoTab(): string {
-  return `<div id="tab-video" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-2"><i class="fas fa-video text-rose-400 mr-2"></i>Videographie hebdo</h2>
-  <p class="text-gray-400 mb-6 text-sm">Chaque weekend, resume ta semaine. L'IA analysera et extraira des evenements de vie.</p>
-  <div class="card rounded-2xl p-5 mb-6">
-    <h3 class="font-semibold mb-3">Resume de la semaine</h3>
-    <input type="text" id="videoTitle" class="w-full px-4 py-2 mb-3 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="Titre (optionnel)">
-    <textarea id="videoSummary" class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:border-violet-500 focus:outline-none resize-none" rows="8" placeholder="Raconte ta semaine... les moments forts, les emotions, les surprises, les difficultes..."></textarea>
-    <button onclick="submitVideo()" class="w-full mt-3 py-3 bg-rose-600 hover:bg-rose-500 rounded-xl font-bold transition-all"><i class="fas fa-paper-plane mr-2"></i>Envoyer (+25 XP)</button>
+  return `<div id="tab-video" class="tab-content hidden fade-in">
+  <h2 class="text-lg font-bold mb-1"><i class="fas fa-video text-rose-400 mr-2"></i>Videographie hebdo</h2>
+  <p class="text-xs text-gray-400 mb-4">Chaque weekend, resume ta semaine. L'IA analysera et extraira des evenements de vie.</p>
+  <div class="card rounded-xl p-4 mb-4">
+    <h3 class="font-semibold text-sm mb-2">Resume de la semaine</h3>
+    <input type="text" id="videoTitle" class="w-full px-3 py-2 mb-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Titre (optionnel)">
+    <textarea id="videoSummary" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="6" placeholder="Raconte ta semaine... moments forts, emotions, surprises, difficultes..."></textarea>
+    <button onclick="submitVideo()" class="w-full mt-2 py-2.5 bg-rose-600 hover:bg-rose-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-paper-plane mr-2"></i>Envoyer (+25 XP)</button>
   </div>
-  <h3 class="font-semibold mb-3">Historique</h3>
-  <div id="videoList" class="space-y-3"><p class="text-gray-500 text-sm">Aucune videographie encore.</p></div>
-</div></div>`;
+  <h3 class="font-semibold text-sm mb-2">Historique</h3>
+  <div id="videoList" class="space-y-2"><p class="text-gray-500 text-xs">Aucune videographie encore.</p></div>
+</div>`;
 }
 
 function getPsychTab(): string {
-  return `<div id="tab-psych" class="tab-content hidden fade-in"><div class="max-w-3xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
-    <div><h2 class="text-2xl font-bold"><i class="fas fa-user-doctor text-pink-400 mr-2"></i>Profil Psychologique</h2><p class="text-gray-400 text-sm">Analyse IA de ta personnalite</p></div>
-    <button onclick="generatePsychProfile()" class="px-4 py-2 bg-pink-600 hover:bg-pink-500 rounded-xl font-medium text-sm transition-all" id="generatePsychBtn"><i class="fas fa-brain mr-1"></i>Generer / Mettre a jour</button>
+  return `<div id="tab-psych" class="tab-content hidden fade-in">
+  <div class="flex items-center justify-between mb-4">
+    <div><h2 class="text-lg font-bold"><i class="fas fa-user-doctor text-pink-400 mr-2"></i>Profil Psychologique</h2><p class="text-xs text-gray-400">Analyse IA de ta personnalite</p></div>
+    <button onclick="generatePsychProfile()" class="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 rounded-lg font-medium text-xs transition-all" id="generatePsychBtn"><i class="fas fa-brain mr-1"></i>Generer</button>
   </div>
-  <div id="psychSummary" class="hidden card rounded-2xl p-5 mb-6 border-pink-500/20"></div>
-  <div id="psychTraits" class="space-y-3"><p class="text-gray-500 text-sm">Aucun profil genere. Ajoute des donnees (ligne de vie, check-ins, captures) puis genere ton profil.</p></div>
-</div></div>`;
+  <div id="psychSummary" class="hidden card rounded-xl p-4 mb-4 border-pink-500/20"></div>
+  <div id="psychTraits" class="space-y-2"><p class="text-gray-500 text-xs">Aucun profil genere. Ajoute des donnees puis genere ton profil.</p></div>
+</div>`;
 }
 
 function getThoughtTreeTab(): string {
-  return `<div id="tab-thoughttree" class="tab-content hidden fade-in"><div class="max-w-3xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
-    <div><h2 class="text-2xl font-bold"><i class="fas fa-sitemap text-teal-400 mr-2"></i>Arbre des Pensees</h2><p class="text-gray-400 text-sm">Organisation de tes reflexions par branches</p></div>
-    <button onclick="categorizeThoughts()" class="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-xl font-medium text-sm transition-all"><i class="fas fa-wand-magic-sparkles mr-1"></i>Categoriser</button>
+  return `<div id="tab-thoughttree" class="tab-content hidden fade-in">
+  <div class="flex items-center justify-between mb-4">
+    <div><h2 class="text-lg font-bold"><i class="fas fa-sitemap text-teal-400 mr-2"></i>Arbre des Pensees</h2><p class="text-xs text-gray-400">Organisation de tes reflexions</p></div>
+    <button onclick="categorizeThoughts()" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg font-medium text-xs transition-all"><i class="fas fa-wand-magic-sparkles mr-1"></i>Categoriser</button>
   </div>
-  <div id="thoughtBranches" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6"></div>
-  <h3 class="font-semibold mb-3">Pensees recentes</h3>
-  <div id="thoughtEntries" class="space-y-3"><p class="text-gray-500 text-sm">Aucune pensee categorisee. Clique sur "Categoriser" pour analyser tes captures et check-ins.</p></div>
-</div></div>`;
+  <div id="thoughtBranches" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4"></div>
+  <h3 class="font-semibold text-sm mb-2">Pensees recentes</h3>
+  <div id="thoughtEntries" class="space-y-2"><p class="text-gray-500 text-xs">Aucune pensee categorisee. Clique sur "Categoriser".</p></div>
+</div>`;
 }
 
-function getPatternsTab(): string {
-  return `<div id="tab-patterns" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-2"><i class="fas fa-brain text-violet-400 mr-2"></i>Patterns</h2><p class="text-gray-400 mb-6">Schemas detectes</p>
-  <div id="patternList" class="space-y-4 mb-8"><p class="text-gray-500 text-sm">Aucun pattern detecte.</p></div>
-  <div class="border-t border-white/10 pt-6">
-    <h3 class="font-semibold mb-3">Autodeclarer un pattern</h3>
-    <button onclick="openSelfDeclare()" class="px-6 py-3 bg-violet-600/50 hover:bg-violet-600 rounded-xl font-medium transition-all text-sm"><i class="fas fa-hand-point-up mr-2"></i>Je me reconnais</button>
-  </div>
-</div></div>`;
-}
-
-function getQuestsTab(): string {
-  return `<div id="tab-quests" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-2"><i class="fas fa-scroll text-violet-400 mr-2"></i>Quetes</h2><p class="text-gray-400 mb-6">Basees sur tes patterns</p>
-  <div id="questList" class="space-y-4"><div class="card rounded-2xl p-8 text-center"><div class="text-4xl mb-3">&#128302;</div><h3 class="font-semibold mb-2">Les quetes emergent de tes donnees</h3><p class="text-sm text-gray-400">Continue tes check-ins.</p></div></div>
-</div></div>`;
-}
-
-function getRitualsTab(): string {
-  return `<div id="tab-rituals" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-2"><i class="fas fa-gem text-violet-400 mr-2"></i>Rituels</h2><p class="text-gray-400 mb-6">Introspections periodiques</p>
-  <div id="ritualList" class="space-y-4"><div class="card rounded-2xl p-8 text-center"><div class="text-4xl mb-3">&#128274;</div><h3 class="font-semibold mb-2">Niveau 5 requis</h3><p class="text-sm text-gray-400">Continue a travailler tes patterns.</p></div></div>
-</div></div>`;
-}
-
-function getHistoryTab(): string {
-  return `<div id="tab-history" class="tab-content hidden fade-in"><div class="max-w-2xl mx-auto">
-  <h2 class="text-2xl font-bold mb-6"><i class="fas fa-chart-line text-violet-400 mr-2"></i>Historique</h2>
-  <div id="historyContent" class="space-y-4"><p class="text-gray-500 text-sm">Chargement...</p></div>
-</div></div>`;
-}
+// Patterns, Quests, Rituals, History are now sub-views opened from Dashboard via modals/inline
 
 // ============================================
-// APP JAVASCRIPT
+// APP JAVASCRIPT (v3 — Refactored)
 // ============================================
 function getAppJS(): string {
   return `
-const API='';let token=localStorage.getItem('token');let userData=null;let emotions={};
+const API='';let token=localStorage.getItem('token');let userData=null;let emotions={};let userLevel=1;
 if(!token)window.location.href='/';
 const headers=()=>({'Content-Type':'application/json','Authorization':'Bearer '+token});
+
+// UNLOCK LEVELS: which global_level unlocks each feature
+const UNLOCK={morning:1,capture:1,evening:2,weekly:3,stats:3,patterns:4,quests:4,rituals:5};
 
 async function init(){try{
   await fetch(API+'/api/init-db');
@@ -1601,63 +1632,149 @@ async function init(){try{
   renderDashboard();renderEmotionWheel();showTab('dashboard');
 }catch(e){console.error('Init:',e)}}
 
+// === TAB NAVIGATION ===
 function showTab(t){
   document.querySelectorAll('.tab-content').forEach(el=>el.classList.add('hidden'));
-  document.querySelectorAll('.tab-btn').forEach(el=>{el.classList.remove('tab-active');el.classList.add('text-gray-400')});
+  // Desktop tabs
+  document.querySelectorAll('.tab-btn').forEach(el=>{el.classList.remove('border-violet-500','text-violet-300');el.classList.add('border-transparent','text-gray-400')});
+  // Mobile bottom nav
+  document.querySelectorAll('.bottom-nav-btn').forEach(el=>el.classList.remove('active'));
   const te=document.getElementById('tab-'+t);if(te)te.classList.remove('hidden');
-  const btn=document.querySelector('[data-tab="'+t+'"]');if(btn){btn.classList.add('tab-active');btn.classList.remove('text-gray-400')}
-  if(t==='quests')loadQuests();if(t==='patterns')loadPatterns();if(t==='rituals')loadRituals();if(t==='history')loadHistory();
+  document.querySelectorAll('[data-tab="'+t+'"]').forEach(btn=>{
+    if(btn.classList.contains('tab-btn')){btn.classList.add('border-violet-500','text-violet-300');btn.classList.remove('border-transparent','text-gray-400')}
+    if(btn.classList.contains('bottom-nav-btn'))btn.classList.add('active')
+  });
   if(t==='lifeline')loadLifeline();if(t==='habits')loadHabits();if(t==='video')loadVideos();
   if(t==='psych')loadPsychProfile();if(t==='thoughttree')loadThoughtTree();
+  if(t==='dashboard')renderDashboard();
 }
 
+// === LOCK SYSTEM ===
+function handleLockedClick(reqLevel,action){
+  if(userLevel<reqLevel){showToast('\\u{1F512}','Debloque au niveau '+reqLevel+' (tu es Nv.'+userLevel+')');return}
+  // Dispatch action
+  if(action==='evening')openEveningModal();
+  else if(action==='decontamination')openWeeklyExercise('decontamination');
+  else if(action==='influence')openWeeklyExercise('influence');
+  else if(action==='worry')openWeeklyExercise('worry');
+  else if(action==='patterns')openPatternsView();
+  else if(action==='quests')openQuestsView();
+  else if(action==='rituals')openRitualsView();
+}
+
+function applyLockStates(){
+  document.querySelectorAll('[data-unlock]').forEach(el=>{
+    const req=parseInt(el.dataset.unlock);
+    if(userLevel<req){
+      el.classList.add('locked-card');
+      // Add lock overlay if not present
+      if(!el.querySelector('.lock-overlay')){
+        const ov=document.createElement('div');ov.className='lock-overlay';
+        ov.innerHTML='<i class="fas fa-lock text-gray-500 text-lg mb-1"></i><span class="text-[10px] text-gray-500 font-medium">Nv.'+req+'</span>';
+        el.appendChild(ov);
+      }
+    } else {
+      el.classList.remove('locked-card');
+      const ov=el.querySelector('.lock-overlay');if(ov)ov.remove();
+    }
+  });
+  // Section headers
+  const setLock=(id,lv)=>{const el=document.getElementById(id);if(el)el.textContent=userLevel<lv?'\\u{1F512} Nv.'+lv:'';};
+  setLock('weeklyLock',3);setLock('patternsLock',4);setLock('ritualsLock',5);setLock('statsLock',3);
+}
+
+// === DASHBOARD RENDER ===
 function renderDashboard(){
   if(!userData)return;const u=userData.user;const s=userData.stats;
+  userLevel=s?.global_level||1;
   document.getElementById('userName').textContent=u.display_name||u.username;
   document.getElementById('streakCount').textContent=u.current_streak||0;
-  document.getElementById('globalLevel').textContent='Nv. '+(s?.global_level||1);
-  const aw=userData.awakening_names||[];document.getElementById('awakeningTitle').textContent=aw[(s?.global_level||1)-1]||'';
-  document.getElementById('morningStatus').textContent=userData.today.morning_done?'\\u2705 Complete':'\\u23F3 En attente';
-  document.getElementById('eveningStatus').textContent=userData.today.evening_done?'\\u2705 Complete':'\\u23F3 En attente';
+  document.getElementById('globalLevel').textContent='Nv.'+userLevel;
+  document.getElementById('globalLevelNum').textContent=userLevel;
+  const aw=userData.awakening_names||[];
+  document.getElementById('awakeningTitle').textContent=aw[userLevel-1]||'';
+
+  // XP ring
+  const th=userData.level_thresholds||[0,100,300,600,1000,1500,2200,3000,4000,5500];
+  const totalXP=s?.total_xp||0;const curTh=th[userLevel-1]||0;const nextTh=th[userLevel]||th[th.length-1];
+  const pct=nextTh>curTh?((totalXP-curTh)/(nextTh-curTh))*100:100;
+  const circ=document.getElementById('xpCircle');if(circ)circ.setAttribute('stroke-dasharray',Math.min(pct,100)+' 100');
+  const xpBar=document.getElementById('xpBar');if(xpBar)xpBar.style.width=Math.min(pct,100)+'%';
+  const xpCur=document.getElementById('xpCurrent');if(xpCur)xpCur.textContent=totalXP;
+  const xpNxt=document.getElementById('xpNext');if(xpNxt)xpNxt.textContent=nextTh;
+
+  // Daily status
+  document.getElementById('morningStatus').textContent=userData.today.morning_done?'\\u2705 Fait':'A faire';
+  document.getElementById('eveningStatus').textContent=userData.today.evening_done?'\\u2705 Fait':'A faire';
   if(userData.today.morning_done)document.getElementById('morningCard').style.borderColor='rgba(34,197,94,.3)';
-  if(userData.today.evening_done)document.getElementById('eveningCard').style.borderColor='rgba(34,197,94,.3)';
-  document.getElementById('lifeEventsCount').textContent=userData.counts.life_events||0;
-  document.getElementById('habitsCount').textContent=userData.counts.active_habits||0;
+  else document.getElementById('morningCard').style.borderColor='';
+  if(userData.today.evening_done){const ec=document.getElementById('eveningCard');if(ec)ec.style.borderColor='rgba(34,197,94,.3)'}
+  document.getElementById('captureCount').textContent=(userData.counts.total_captures||0)+' captures';
+  document.getElementById('patternCount').textContent=(userData.counts.active_patterns||0)+' detectes';
+  document.getElementById('questCount').textContent=(userData.counts.active_quests||0)+' disponibles';
+
+  // Stats grid
   const sc=[{key:'lucidity',icon:'\\u{1F9E0}',color:'bg-blue-500',label:'Lucidite'},{key:'resonance',icon:'\\u{1F49A}',color:'bg-green-500',label:'Resonance'},{key:'liberty',icon:'\\u{1F513}',color:'bg-yellow-500',label:'Liberte'},{key:'connection',icon:'\\u{1F5E3}\\uFE0F',color:'bg-pink-500',label:'Connexion'},{key:'action',icon:'\\u26A1',color:'bg-orange-500',label:'Action'}];
-  const th=userData.level_thresholds||[0,100,300,600,1000,1500,2200,3000,4000,5500];const ln=userData.level_names||{};
+  const ln=userData.level_names||{};
   let h='';for(const st of sc){const xp=s?.[st.key+'_xp']||0;const lv=s?.[st.key+'_level']||1;const nm=(ln[st.key]||[])[lv-1]||'';const nt=th[lv]||th[th.length-1];const pt=th[lv-1]||0;const pr=nt>pt?((xp-pt)/(nt-pt))*100:100;
-    h+='<div class="card rounded-xl p-4"><div class="flex items-center gap-2 mb-2"><span class="text-xl">'+st.icon+'</span><div><div class="font-semibold text-sm">'+st.label+'</div><div class="text-xs text-gray-400">'+nm+' (Nv.'+lv+')</div></div></div><div class="stat-bar"><div class="stat-fill '+st.color+'" style="width:'+Math.min(pr,100)+'%"></div></div><div class="text-xs text-gray-500 mt-1">'+xp+' / '+nt+' XP</div></div>'}
+    h+='<div class="card rounded-lg p-3"><div class="flex items-center gap-1.5 mb-1.5"><span class="text-base">'+st.icon+'</span><div class="min-w-0"><div class="font-semibold text-[11px] truncate">'+st.label+'</div><div class="text-[9px] text-gray-500 truncate">'+nm+'</div></div></div><div class="stat-bar"><div class="stat-fill '+st.color+'" style="width:'+Math.min(pr,100)+'%"></div></div><div class="text-[9px] text-gray-500 mt-1">'+xp+'/'+nt+'</div></div>'}
   document.getElementById('statsGrid').innerHTML=h;
-  if(userData.today.morning_done){document.getElementById('morningForm')?.classList.add('hidden');document.getElementById('morningDone')?.classList.remove('hidden')}
-  if(userData.today.evening_done){document.getElementById('eveningForm')?.classList.add('hidden');document.getElementById('eveningDone')?.classList.remove('hidden')}
+
+  // Recent activity (if level >= 3)
+  if(userLevel>=3){
+    document.getElementById('historyPreview').classList.remove('hidden');
+    loadRecentActivity();
+  }
+
+  // Apply lock states
+  applyLockStates();
 }
 
+async function loadRecentActivity(){
+  try{const r=await fetch(API+'/api/me/history?days=7',{headers:headers()});const d=await r.json();const el=document.getElementById('recentActivity');
+  if(!el)return;
+  const items=(d.xp_history||[]).slice(0,8);
+  if(!items.length){el.innerHTML='<p class="text-[10px] text-gray-600">Aucune activite recente</p>';return}
+  el.innerHTML=items.map(x=>{const t=(x.lucidity_xp||0)+(x.resonance_xp||0)+(x.liberty_xp||0)+(x.connection_xp||0)+(x.action_xp||0);
+    const dt=new Date(x.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    return '<div class="flex items-center justify-between text-[10px]"><span class="text-gray-500">'+dt+'</span><span class="text-gray-300 flex-1 mx-2 truncate">'+(x.description||x.source_type)+'</span><span class="text-violet-400 font-medium">+'+t+'</span></div>'}).join('')}catch(e){}}
+
+// === EMOTION WHEEL ===
 function renderEmotionWheel(){
   const ce={joy:'\\u{1F60A}',sadness:'\\u{1F622}',anger:'\\u{1F620}',fear:'\\u{1F630}',surprise:'\\u{1F632}',disgust:'\\u{1F922}',neutral:'\\u{1F610}'};
   const cn={joy:'Joie',sadness:'Tristesse',anger:'Colere',fear:'Peur',surprise:'Surprise',disgust:'Degout',neutral:'Neutre'};
-  let h='';for(const[cat,emos]of Object.entries(emotions)){h+='<div class="mb-3"><div class="flex items-center gap-2 mb-2"><span>'+(ce[cat]||'')+'</span><span class="text-xs font-medium text-gray-300">'+(cn[cat]||cat)+'</span></div><div class="flex flex-wrap gap-2">';
-    for(const em of emos){h+='<button type="button" class="emotion-chip px-3 py-1.5 rounded-full text-xs bg-white/5 border border-white/10 hover:border-violet-500/50" onclick="selectEmotion(this,\\''+em+'\\')">'+em+'</button>'}h+='</div></div>'}
+  let h='';for(const[cat,emos]of Object.entries(emotions)){h+='<div class="mb-2"><div class="flex items-center gap-1 mb-1"><span class="text-sm">'+(ce[cat]||'')+'</span><span class="text-[10px] font-medium text-gray-400">'+(cn[cat]||cat)+'</span></div><div class="flex flex-wrap gap-1">';
+    for(const em of emos){h+='<button type="button" class="emotion-chip px-2 py-1 rounded-full text-[10px] bg-white/5 border border-white/10" onclick="selectEmotion(this,\\''+em+'\\')">'+em+'</button>'}h+='</div></div>'}
   document.getElementById('emotionWheel').innerHTML=h}
-function selectEmotion(el,e){document.querySelectorAll('.emotion-chip').forEach(x=>x.classList.remove('selected','bg-violet-500/30','border-violet-500'));el.classList.add('selected','bg-violet-500/30','border-violet-500');document.getElementById('selectedEmotion').value=e}
+function selectEmotion(el,e){document.querySelectorAll('.emotion-chip').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');document.getElementById('selectedEmotion').value=e}
+
+// === MORNING MODAL ===
+function openMorningModal(){if(userData?.today?.morning_done){showToast('\\u2705','Deja fait ce matin !');return}document.getElementById('morningModal').classList.remove('hidden');document.getElementById('morningModal').classList.add('flex')}
+function closeMorningModal(){document.getElementById('morningModal').classList.add('hidden');document.getElementById('morningModal').classList.remove('flex')}
 
 async function submitMorningCheckin(){
   const em=document.getElementById('selectedEmotion').value;if(!em){showToast('\\u26A0','Choisis une emotion');return}
   try{const r=await fetch(API+'/api/checkin/morning',{method:'POST',headers:headers(),body:JSON.stringify({emotion:em,emotion_detail:document.getElementById('emotionDetail').value,energy_level:parseInt(document.getElementById('energyLevel').value),intention:document.getElementById('intention').value})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}document.getElementById('morningForm').classList.add('hidden');document.getElementById('morningDone').classList.remove('hidden');showToast('\\u2728','+5 XP Resonance ! Streak: '+(d.streak?.current_streak||1));refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeMorningModal();showToast('\\u2728','+5 XP Resonance ! Streak: '+(d.streak?.current_streak||1));refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+
+// === EVENING MODAL ===
+function openEveningModal(){if(userData?.today?.evening_done){showToast('\\u2705','Deja fait ce soir !');return}document.getElementById('eveningModal').classList.remove('hidden');document.getElementById('eveningModal').classList.add('flex')}
+function closeEveningModal(){document.getElementById('eveningModal').classList.add('hidden');document.getElementById('eveningModal').classList.remove('flex')}
 
 async function submitEveningCheckin(){
   const v=[document.getElementById('victory1').value,document.getElementById('victory2').value,document.getElementById('victory3').value].filter(x=>x.trim());
   const g=document.getElementById('gratitude').value;const se=document.getElementById('strongEmotion').value;const tr=document.getElementById('emotionTrigger').value;
   if(!v.length&&!g&&!se){showToast('\\u26A0','Complete au moins un exercice');return}
   try{const r=await fetch(API+'/api/checkin/evening',{method:'POST',headers:headers(),body:JSON.stringify({micro_victories:JSON.stringify(v),invisible_gratitude:g,strong_emotion:se,strong_emotion_trigger:tr})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}document.getElementById('eveningForm').classList.add('hidden');document.getElementById('eveningDone').classList.remove('hidden');showToast('\\u{1F319}','Scan enregistre ! +'+(d.exercises_completed*5)+' XP');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeEveningModal();showToast('\\u{1F319}','Scan enregistre ! +'+(d.exercises_completed*5)+' XP');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
+// === CAPTURE ===
 function openCapture(){document.getElementById('captureModal').classList.remove('hidden');document.getElementById('captureModal').classList.add('flex');document.getElementById('captureContent').focus()}
 function closeCapture(){document.getElementById('captureModal').classList.add('hidden');document.getElementById('captureModal').classList.remove('flex')}
 async function submitCapture(){
   const c=document.getElementById('captureContent').value;if(!c.trim()){showToast('\\u26A0','Ecris quelque chose');return}
   try{const r=await fetch(API+'/api/capture/new',{method:'POST',headers:headers(),body:JSON.stringify({content:c,intensity:parseInt(document.getElementById('captureIntensity').value)})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}document.getElementById('captureContent').value='';closeCapture();showToast('\\u26A1','+2 XP Lucidite'+(d.analysis?.emotion?' | '+d.analysis.emotion:''));refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}document.getElementById('captureContent').value='';closeCapture();showToast('\\u26A1','+2 XP'+(d.analysis?.emotion?' | '+d.analysis.emotion:''));refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
 // === LIFELINE ===
 async function loadLifeline(){
@@ -1665,23 +1782,23 @@ async function loadLifeline(){
   const op=document.getElementById('onboardingPrompt');const cnt=evts.length;
   if(cnt<10){op.classList.remove('hidden');document.getElementById('onboardingProgress').style.width=(cnt*10)+'%';document.getElementById('onboardingCount').textContent=cnt+'/10'}else{op.classList.add('hidden')}
   const el=document.getElementById('lifelineContent');
-  if(!evts.length){el.innerHTML='<p class="text-gray-500 text-sm text-center py-8">Aucun evenement. Commence par ajouter les 10 moments les plus importants de ta vie.</p>';return}
-  el.innerHTML=evts.map(e=>{const emos=(e.emotions||[]).map(em=>'<span class="px-2 py-0.5 rounded-full text-xs bg-violet-500/20 text-violet-300">'+em.emotion+' ('+em.intensity+'/10)</span>').join(' ');
-    const valColor=e.valence==='positive'?'text-green-400':e.valence==='negative'?'text-red-400':'text-yellow-400';
-    return '<div class="card rounded-2xl p-5"><div class="flex items-center justify-between mb-2"><h3 class="font-semibold">'+e.title+'</h3><div class="flex items-center gap-2"><span class="text-xs '+valColor+'">'+(e.valence||'mixed')+'</span><span class="text-xs text-gray-500">'+(e.age_at_event?e.age_at_event+' ans':'')+'</span></div></div>'+(e.description?'<p class="text-sm text-gray-400 mb-2">'+e.description+'</p>':'')+'<div class="flex items-center gap-2 mb-2"><span class="text-xs text-gray-500">Intensite: '+e.global_intensity+'/10</span><span class="text-xs text-gray-500">|</span><span class="text-xs text-gray-500">'+(e.life_domain||'')+'</span></div><div class="flex flex-wrap gap-1">'+emos+'</div></div>'}).join('')}catch(e){console.error(e)}}
+  if(!evts.length){el.innerHTML='<p class="text-gray-500 text-xs text-center py-6">Aucun evenement. Ajoute tes 10 moments cles.</p>';return}
+  el.innerHTML=evts.map(e=>{const emos=(e.emotions||[]).map(em=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-violet-500/20 text-violet-300">'+em.emotion+' '+em.intensity+'/10</span>').join(' ');
+    const vc=e.valence==='positive'?'text-green-400':e.valence==='negative'?'text-red-400':'text-yellow-400';
+    return '<div class="card rounded-xl p-3"><div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-sm truncate flex-1">'+e.title+'</h3><div class="flex items-center gap-1.5 ml-2"><span class="text-[10px] '+vc+'">'+(e.valence||'mixed')+'</span>'+(e.age_at_event?'<span class="text-[10px] text-gray-500">'+e.age_at_event+'ans</span>':'')+'</div></div>'+(e.description?'<p class="text-xs text-gray-400 mb-1 line-clamp-2">'+e.description+'</p>':'')+'<div class="flex items-center gap-1.5 flex-wrap"><span class="text-[10px] text-gray-500">'+e.global_intensity+'/10</span><span class="text-[10px] text-gray-600">'+( e.life_domain||'')+'</span>'+emos+'</div></div>'}).join('')}catch(e){console.error(e)}}
 
-function openLifeEventForm(evt){
+function openLifeEventForm(){
   const m=document.getElementById('lifeEventModal');m.classList.remove('hidden');m.classList.add('flex');
   const domains=['famille','relation','travail','sante','argent','amitie','education','identite','perte','reussite','traumatisme','quotidien'];
-  document.getElementById('lifeEventContent').innerHTML='<div class="space-y-4">'+
-    '<div><label class="block text-sm text-gray-300 mb-1">Titre *</label><input type="text" id="evtTitle" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="Ex: Demenagement a Paris"></div>'+
-    '<div><label class="block text-sm text-gray-300 mb-1">Description</label><textarea id="evtDesc" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="3" placeholder="Decris ce moment..."></textarea></div>'+
-    '<div class="grid grid-cols-2 gap-3"><div><label class="block text-sm text-gray-300 mb-1">Age</label><input type="number" id="evtAge" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none" placeholder="ex: 15" min="0" max="120"></div><div><label class="block text-sm text-gray-300 mb-1">Domaine</label><select id="evtDomain" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm">'+domains.map(d=>'<option value="'+d+'">'+d+'</option>').join('')+'</select></div></div>'+
-    '<div class="grid grid-cols-2 gap-3"><div><label class="block text-sm text-gray-300 mb-1">Intensite: <span id="evtIntVal">5</span>/10</label><input type="range" id="evtIntensity" min="1" max="10" value="5" class="w-full accent-violet-500" oninput="document.getElementById(\\'evtIntVal\\').textContent=this.value"></div><div><label class="block text-sm text-gray-300 mb-1">Valence</label><select id="evtValence" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"><option value="positive">Positif</option><option value="negative">Negatif</option><option value="mixed" selected>Mixte</option></select></div></div>'+
-    '<div><label class="block text-sm text-gray-300 mb-2">Emotions associees</label><div id="evtEmotions"><div class="flex gap-2 mb-2"><input type="text" class="evt-emo-name flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" placeholder="Emotion"><input type="number" class="evt-emo-int w-20 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" placeholder="1-10" min="1" max="10" value="5"></div></div><button type="button" onclick="addEmotionField()" class="text-xs text-violet-400 hover:text-violet-300"><i class="fas fa-plus mr-1"></i>Ajouter emotion</button></div>'+
-    '<button onclick="submitLifeEvent()" class="w-full py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold transition-all"><i class="fas fa-check mr-2"></i>Enregistrer</button></div>'}
+  document.getElementById('lifeEventContent').innerHTML='<div class="space-y-3">'+
+    '<div><label class="block text-xs text-gray-300 mb-1">Titre *</label><input type="text" id="evtTitle" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="Ex: Demenagement a Paris"></div>'+
+    '<div><label class="block text-xs text-gray-300 mb-1">Description</label><textarea id="evtDesc" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2" placeholder="Decris ce moment..."></textarea></div>'+
+    '<div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-gray-300 mb-1">Age</label><input type="number" id="evtAge" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none" placeholder="15" min="0" max="120"></div><div><label class="block text-xs text-gray-300 mb-1">Domaine</label><select id="evtDomain" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs">'+domains.map(d=>'<option value="'+d+'">'+d+'</option>').join('')+'</select></div></div>'+
+    '<div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-gray-300 mb-1">Intensite: <span id="evtIntVal">5</span>/10</label><input type="range" id="evtIntensity" min="1" max="10" value="5" class="w-full accent-violet-500" oninput="document.getElementById(\\'evtIntVal\\').textContent=this.value"></div><div><label class="block text-xs text-gray-300 mb-1">Valence</label><select id="evtValence" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs"><option value="positive">Positif</option><option value="negative">Negatif</option><option value="mixed" selected>Mixte</option></select></div></div>'+
+    '<div><label class="block text-xs text-gray-300 mb-1">Emotions</label><div id="evtEmotions"><div class="flex gap-2 mb-1"><input type="text" class="evt-emo-name flex-1 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs" placeholder="Emotion"><input type="number" class="evt-emo-int w-16 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs" placeholder="1-10" min="1" max="10" value="5"></div></div><button type="button" onclick="addEmotionField()" class="text-[10px] text-violet-400"><i class="fas fa-plus mr-1"></i>Ajouter</button></div>'+
+    '<button onclick="submitLifeEvent()" class="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-check mr-2"></i>Enregistrer</button></div>'}
 
-function addEmotionField(){const d=document.getElementById('evtEmotions');const div=document.createElement('div');div.className='flex gap-2 mb-2';div.innerHTML='<input type="text" class="evt-emo-name flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" placeholder="Emotion"><input type="number" class="evt-emo-int w-20 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" placeholder="1-10" min="1" max="10" value="5">';d.appendChild(div)}
+function addEmotionField(){const d=document.getElementById('evtEmotions');const div=document.createElement('div');div.className='flex gap-2 mb-1';div.innerHTML='<input type="text" class="evt-emo-name flex-1 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs" placeholder="Emotion"><input type="number" class="evt-emo-int w-16 px-2 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs" placeholder="1-10" min="1" max="10" value="5">';d.appendChild(div)}
 function closeLifeEventModal(){document.getElementById('lifeEventModal').classList.add('hidden');document.getElementById('lifeEventModal').classList.remove('flex')}
 
 async function submitLifeEvent(){
@@ -1693,9 +1810,9 @@ async function submitLifeEvent(){
 // === HABITS ===
 async function loadHabits(){
   try{const r=await fetch(API+'/api/habits/list',{headers:headers()});const d=await r.json();const el=document.getElementById('habitsContent');
-  if(!d.habits?.length){el.innerHTML='<p class="text-gray-500 text-sm text-center py-4">Aucune habitude. Ajoute-en une !</p>';return}
-  el.innerHTML=d.habits.map(h=>{const done=h.today_done;const sys=h.is_system_habit?'<span class="text-xs bg-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full">Fondateur</span>':'';
-    return '<div class="card rounded-2xl p-4 flex items-center gap-4"><button onclick="'+(done?'':'logHabit('+h.id+')')+'" class="w-10 h-10 rounded-full flex items-center justify-center '+(done?'bg-green-500/30 text-green-400':'bg-gray-700 text-gray-400 hover:bg-violet-500/30 hover:text-violet-300')+' transition-all"><i class="fas '+(done?'fa-check':'fa-circle')+' text-lg"></i></button><div class="flex-1"><div class="flex items-center gap-2"><h3 class="font-semibold text-sm">'+h.name+'</h3>'+sys+'</div><div class="flex items-center gap-3 text-xs text-gray-500 mt-1"><span><i class="fas fa-fire text-orange-400 mr-1"></i>'+h.current_streak+'j</span><span>'+h.total_completions+' total</span><span>'+h.frequency+'</span></div></div>'+(h.is_system_habit?'':'<button onclick="deleteHabit('+h.id+')" class="text-gray-600 hover:text-red-400 text-sm"><i class="fas fa-trash"></i></button>')+'</div>'}).join('')}catch(e){console.error(e)}}
+  if(!d.habits?.length){el.innerHTML='<p class="text-gray-500 text-xs text-center py-4">Aucune habitude.</p>';return}
+  el.innerHTML=d.habits.map(h=>{const done=h.today_done;const sys=h.is_system_habit?'<span class="text-[9px] bg-violet-500/20 text-violet-300 px-1.5 py-0.5 rounded-full">Systeme</span>':'';
+    return '<div class="card rounded-xl p-3 flex items-center gap-3"><button onclick="'+(done?'':'logHabit('+h.id+')')+'" class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 '+(done?'bg-green-500/30 text-green-400':'bg-gray-700 text-gray-400 hover:bg-violet-500/30 hover:text-violet-300')+' transition-all text-sm"><i class="fas '+(done?'fa-check':'fa-circle')+'"></i></button><div class="flex-1 min-w-0"><div class="flex items-center gap-1.5"><h3 class="font-semibold text-xs truncate">'+h.name+'</h3>'+sys+'</div><div class="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5"><span><i class="fas fa-fire text-orange-400"></i> '+h.current_streak+'j</span><span>'+h.total_completions+'x</span><span>'+h.frequency+'</span></div></div>'+(h.is_system_habit?'':'<button onclick="deleteHabit('+h.id+')" class="text-gray-600 hover:text-red-400 text-xs flex-shrink-0"><i class="fas fa-trash"></i></button>')+'</div>'}).join('')}catch(e){console.error(e)}}
 
 function openAddHabit(){document.getElementById('addHabitForm').classList.toggle('hidden')}
 async function submitNewHabit(){
@@ -1705,24 +1822,23 @@ async function submitNewHabit(){
 
 async function logHabit(id){
   try{const r=await fetch(API+'/api/habits/log',{method:'POST',headers:headers(),body:JSON.stringify({habit_id:id})});
-  const d=await r.json();if(d.error){showToast('\\u26A0',d.error);return}showToast('\\u2705','Habitude validee ! Streak: '+d.streak+'j');loadHabits();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u26A0',d.error);return}showToast('\\u2705','Streak: '+d.streak+'j');loadHabits();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
-async function deleteHabit(id){if(!confirm('Supprimer cette habitude ?'))return;
-  try{await fetch(API+'/api/habits/'+id,{method:'DELETE',headers:headers()});loadHabits()}catch(e){showToast('\\u274C','Erreur')}}
+async function deleteHabit(id){if(!confirm('Supprimer ?'))return;try{await fetch(API+'/api/habits/'+id,{method:'DELETE',headers:headers()});loadHabits()}catch(e){}}
 
 // === VIDEO ===
 async function loadVideos(){
   try{const r=await fetch(API+'/api/video/list',{headers:headers()});const d=await r.json();const el=document.getElementById('videoList');
-  if(!d.videos?.length){el.innerHTML='<p class="text-gray-500 text-sm">Aucune videographie.</p>';return}
-  el.innerHTML=d.videos.map(v=>{const themes=v.ai_key_themes?JSON.parse(v.ai_key_themes).map(t=>'<span class="px-2 py-0.5 rounded-full text-xs bg-rose-500/20 text-rose-300">'+t+'</span>').join(' '):'';
-    return '<div class="card rounded-2xl p-5"><div class="flex items-center justify-between mb-2"><h3 class="font-semibold">'+(v.title||'Semaine '+v.week_number)+'</h3><span class="text-xs text-gray-500">S'+v.week_number+' / '+v.year+'</span></div>'+(v.ai_summary?'<p class="text-sm text-gray-400 mb-2">'+v.ai_summary+'</p>':'')+'<div class="flex flex-wrap gap-1">'+themes+'</div></div>'}).join('')}catch(e){console.error(e)}}
+  if(!d.videos?.length){el.innerHTML='<p class="text-gray-500 text-xs">Aucune videographie.</p>';return}
+  el.innerHTML=d.videos.map(v=>{const themes=v.ai_key_themes?JSON.parse(v.ai_key_themes).map(t=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-rose-500/20 text-rose-300">'+t+'</span>').join(' '):'';
+    return '<div class="card rounded-xl p-3"><div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-sm">'+(v.title||'S'+v.week_number)+'</h3><span class="text-[10px] text-gray-500">S'+v.week_number+'/'+v.year+'</span></div>'+(v.ai_summary?'<p class="text-xs text-gray-400 mb-1 line-clamp-2">'+v.ai_summary+'</p>':'')+'<div class="flex flex-wrap gap-1">'+themes+'</div></div>'}).join('')}catch(e){console.error(e)}}
 
 async function submitVideo(){
   const txt=document.getElementById('videoSummary').value;if(!txt.trim()){showToast('\\u26A0','Ecris un resume');return}
   showToast('\\u{1F3AC}','Analyse en cours...');
   try{const r=await fetch(API+'/api/video/submit',{method:'POST',headers:headers(),body:JSON.stringify({title:document.getElementById('videoTitle').value,text_summary:txt})});
   const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}document.getElementById('videoSummary').value='';document.getElementById('videoTitle').value='';
-  showToast('\\u{1F3AC}','Videographie enregistree ! +'+(d.xp?.total_awarded||25)+' XP'+(d.life_events_created?' | '+d.life_events_created+' evenements extraits':''));loadVideos();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  showToast('\\u{1F3AC}','+'+(d.xp?.total_awarded||25)+' XP'+(d.life_events_created?' | '+d.life_events_created+' events':''));loadVideos();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
 // === PSYCH PROFILE ===
 async function loadPsychProfile(){
@@ -1730,22 +1846,22 @@ async function loadPsychProfile(){
   const ts=d.traits||[];const snap=d.last_snapshot;
   const el=document.getElementById('psychTraits');const sum=document.getElementById('psychSummary');
   if(snap?.full_profile){sum.classList.remove('hidden');const p=snap.full_profile;
-    sum.innerHTML='<h3 class="font-bold text-pink-300 mb-2"><i class="fas fa-clipboard-list mr-2"></i>Synthese</h3><p class="text-sm text-gray-300 mb-3">'+(p.global_summary||'')+'</p>'+(p.strengths?'<div class="mb-2"><span class="text-xs font-medium text-green-400">Forces:</span><div class="flex flex-wrap gap-1 mt-1">'+p.strengths.map(s=>'<span class="px-2 py-0.5 rounded-full text-xs bg-green-500/20 text-green-300">'+s+'</span>').join('')+'</div></div>':'')+(p.growth_areas?'<div><span class="text-xs font-medium text-amber-400">Axes:</span><div class="flex flex-wrap gap-1 mt-1">'+p.growth_areas.map(g=>'<span class="px-2 py-0.5 rounded-full text-xs bg-amber-500/20 text-amber-300">'+g+'</span>').join('')+'</div></div>':'')+'<div class="text-xs text-gray-500 mt-3">Points de donnees: '+(snap.data_points_count||0)+' | '+new Date(snap.generated_at).toLocaleDateString('fr-FR')+'</div>'}
+    sum.innerHTML='<h3 class="font-bold text-pink-300 text-sm mb-2"><i class="fas fa-clipboard-list mr-1"></i>Synthese</h3><p class="text-xs text-gray-300 mb-2">'+(p.global_summary||'')+'</p>'+(p.strengths?'<div class="mb-2"><span class="text-[10px] font-medium text-green-400">Forces:</span><div class="flex flex-wrap gap-1 mt-1">'+p.strengths.map(s=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-green-500/20 text-green-300">'+s+'</span>').join('')+'</div></div>':'')+(p.growth_areas?'<div><span class="text-[10px] font-medium text-amber-400">Axes:</span><div class="flex flex-wrap gap-1 mt-1">'+p.growth_areas.map(g=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300">'+g+'</span>').join('')+'</div></div>':'')+'<div class="text-[9px] text-gray-500 mt-2">'+( snap.data_points_count||0)+' points | '+new Date(snap.generated_at).toLocaleDateString('fr-FR')+'</div>'}
   else{sum.classList.add('hidden')}
-  if(!ts.length){el.innerHTML='<p class="text-gray-500 text-sm">Aucun profil. Ajoute des donnees puis genere.</p>';return}
+  if(!ts.length){el.innerHTML='<p class="text-gray-500 text-xs">Aucun profil. Ajoute des donnees puis genere.</p>';return}
   const cats={attachment:'Attachement',defense:'Defenses',bias:'Biais',emotional_regulation:'Regulation emotionnelle',relational:'Relationnel',identity:'Identite',cognitive:'Cognitif'};
   const grouped={};ts.forEach(t=>{const c=t.category||'other';if(!grouped[c])grouped[c]=[];grouped[c].push(t)});
-  let h='';for(const[cat,traits]of Object.entries(grouped)){h+='<div class="mb-4"><h4 class="text-sm font-medium text-gray-400 mb-2">'+(cats[cat]||cat)+'</h4>';
+  let h='';for(const[cat,traits]of Object.entries(grouped)){h+='<div class="mb-3"><h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">'+(cats[cat]||cat)+'</h4>';
     for(const t of traits){const pct=Math.round(t.probability*100);const color=pct>=80?'text-red-400':pct>=60?'text-amber-400':'text-blue-400';
       const ev=t.evidence?JSON.parse(t.evidence):[];
-      h+='<div class="card rounded-xl p-4 mb-2"><div class="flex items-center justify-between mb-1"><span class="font-semibold text-sm">'+t.trait_name+'</span><span class="text-xs font-bold '+color+'">'+pct+'%</span></div><p class="text-xs text-gray-400 mb-2">'+t.description+'</p><div class="stat-bar mb-1"><div class="stat-fill '+(pct>=80?'bg-red-500':pct>=60?'bg-amber-500':'bg-blue-500')+'" style="width:'+pct+'%"></div></div>'+(ev.length?'<div class="text-xs text-gray-500 mt-1">'+ev.slice(0,2).map(e=>'\\u2022 '+e).join('<br>')+'</div>':'')+'</div>'}h+='</div>'}
+      h+='<div class="card rounded-lg p-3 mb-1.5"><div class="flex items-center justify-between mb-1"><span class="font-semibold text-xs">'+t.trait_name+'</span><span class="text-[10px] font-bold '+color+'">'+pct+'%</span></div><p class="text-[10px] text-gray-400 mb-1.5">'+t.description+'</p><div class="stat-bar"><div class="stat-fill '+(pct>=80?'bg-red-500':pct>=60?'bg-amber-500':'bg-blue-500')+'" style="width:'+pct+'%"></div></div>'+(ev.length?'<div class="text-[9px] text-gray-500 mt-1">'+ev.slice(0,2).map(e=>'\\u2022 '+e).join('<br>')+'</div>':'')+'</div>'}h+='</div>'}
   el.innerHTML=h}catch(e){console.error(e)}}
 
 async function generatePsychProfile(){
-  const btn=document.getElementById('generatePsychBtn');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin mr-1"></i>Analyse...';
+  const btn=document.getElementById('generatePsychBtn');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin mr-1"></i>...';
   try{const r=await fetch(API+'/api/psych/generate',{method:'POST',headers:headers()});const d=await r.json();
-  if(d.error){showToast('\\u274C',d.error);return}showToast('\\u{1F9E0}','Profil mis a jour ! +'+((d.xp?.total_awarded)||20)+' XP');loadPsychProfile();refreshProfile()}
-  catch(e){showToast('\\u274C','Erreur')}finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-brain mr-1"></i>Generer / Mettre a jour'}}
+  if(d.error){showToast('\\u274C',d.error);return}showToast('\\u{1F9E0}','Profil mis a jour !');loadPsychProfile();refreshProfile()}
+  catch(e){showToast('\\u274C','Erreur')}finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-brain mr-1"></i>Generer'}}
 
 // === THOUGHT TREE ===
 async function loadThoughtTree(){
@@ -1753,108 +1869,119 @@ async function loadThoughtTree(){
   const bEl=document.getElementById('thoughtBranches');const eEl=document.getElementById('thoughtEntries');
   const branches=d.branches||[];const entries=d.entries||[];
   if(branches.length){bEl.innerHTML=branches.map(b=>{const w=Math.min(100,Math.round((b.thought_count||0)*5));
-    return '<div class="card rounded-xl p-4"><div class="flex items-center justify-between mb-2"><h3 class="font-semibold text-sm">'+b.branch_name+'</h3><span class="text-xs text-gray-500">'+b.thought_count+' pensees</span></div><p class="text-xs text-gray-400 mb-2">'+b.description+'</p><div class="stat-bar"><div class="stat-fill bg-teal-500" style="width:'+w+'%"></div></div></div>'}).join('')}
-  else{bEl.innerHTML='<p class="text-gray-500 text-sm col-span-3">Les branches seront creees automatiquement.</p>'}
-  if(entries.length){eEl.innerHTML=entries.slice(0,20).map(e=>'<div class="card rounded-xl p-4"><p class="text-sm mb-1">'+e.content+'</p><div class="flex items-center gap-2 text-xs text-gray-500"><span>'+e.source_type+'</span>'+(e.branch_names?'<span>| '+e.branch_names+'</span>':'')+(e.ai_analysis?'<span>| '+e.ai_analysis+'</span>':'')+'</div></div>').join('')}
-  else{eEl.innerHTML='<p class="text-gray-500 text-sm">Aucune pensee categorisee.</p>'}}catch(e){console.error(e)}}
+    return '<div class="card rounded-lg p-3"><div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-xs truncate">'+b.branch_name+'</h3><span class="text-[9px] text-gray-500">'+b.thought_count+'</span></div><p class="text-[9px] text-gray-400 mb-1 line-clamp-1">'+b.description+'</p><div class="stat-bar"><div class="stat-fill bg-teal-500" style="width:'+w+'%"></div></div></div>'}).join('')}
+  else{bEl.innerHTML='<p class="text-gray-500 text-xs col-span-3">Branches auto-creees.</p>'}
+  if(entries.length){eEl.innerHTML=entries.slice(0,15).map(e=>'<div class="card rounded-lg p-3"><p class="text-xs mb-1">'+e.content+'</p><div class="flex items-center gap-1.5 text-[9px] text-gray-500"><span>'+e.source_type+'</span>'+(e.branch_names?'<span>| '+e.branch_names+'</span>':'')+'</div></div>').join('')}
+  else{eEl.innerHTML='<p class="text-gray-500 text-xs">Aucune pensee categorisee.</p>'}}catch(e){console.error(e)}}
 
 async function categorizeThoughts(){
-  showToast('\\u{1FA84}','Categorisation en cours...');
+  showToast('\\u{1FA84}','Categorisation...');
   try{const r=await fetch(API+'/api/thought/categorize',{method:'POST',headers:headers()});const d=await r.json();
-  if(d.categorized>0){showToast('\\u{1F333}',d.categorized+' pensees categorisees !');loadThoughtTree();if(d.xp)refreshProfile()}
-  else{showToast('\\u{1F50D}','Aucune nouvelle pensee a categoriser')}}catch(e){showToast('\\u274C','Erreur')}}
+  if(d.categorized>0){showToast('\\u{1F333}',d.categorized+' pensees !');loadThoughtTree();if(d.xp)refreshProfile()}
+  else{showToast('\\u{1F50D}','Rien a categoriser')}}catch(e){showToast('\\u274C','Erreur')}}
 
-// === WEEKLY ===
+// === WEEKLY EXERCISES (opened from dashboard) ===
 function openWeeklyExercise(type){
   const m=document.getElementById('weeklyModal');m.classList.remove('hidden');m.classList.add('flex');
   const t=document.getElementById('weeklyTitle');const c=document.getElementById('weeklyContent');
-  if(type==='decontamination'){t.innerHTML='\\u{1F9F9} La Decontamination';c.innerHTML='<div class="space-y-4"><div><label class="block text-sm text-gray-300 mb-1">Pensee envahissante</label><textarea id="wInvasive" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-sm text-gray-300 mb-1">Preuves POUR</label><textarea id="wProofsFor" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-sm text-gray-300 mb-1">Preuves CONTRE</label><textarea id="wProofsAgainst" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-sm text-gray-300 mb-1">Pire scenario</label><textarea id="wWorst" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-sm text-gray-300 mb-1">Plus probable</label><textarea id="wProbable" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-sm text-gray-300 mb-1">Meilleur raisonnable</label><textarea id="wBest" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-sm text-gray-300 mb-1">Conclusion</label><textarea id="wConclusion" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><button onclick="submitDecontamination()" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold transition-all"><i class="fas fa-check mr-2"></i>Valider</button></div>'}
-  else if(type==='influence'){t.innerHTML='\\u{1F3AF} Cercle d\\'influence';c.innerHTML='<div class="space-y-4"><textarea id="iConcerns" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="4" placeholder="Tes preoccupations (une par ligne)"></textarea><textarea id="iReflections" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="3" placeholder="Reflexions: que choisis-tu de relacher ?"></textarea><button onclick="submitInfluenceCircle()" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold transition-all"><i class="fas fa-check mr-2"></i>Valider</button></div>'}
-  else if(type==='worry'){t.innerHTML='\\u{1F4E6} Boite a soucis';c.innerHTML='<div class="space-y-4"><textarea id="wItems" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="4" placeholder="Ce que tu craignais vs ce qui s\\'est passe (un par ligne)"></textarea><textarea id="wInsight" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="3" placeholder="Insight global"></textarea><button onclick="submitWorryReview()" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold transition-all"><i class="fas fa-check mr-2"></i>Valider</button></div>'}}
+  if(type==='decontamination'){t.innerHTML='<i class="fas fa-broom mr-1"></i>Decontamination';c.innerHTML='<div class="space-y-3"><div><label class="block text-xs text-gray-300 mb-1">Pensee envahissante</label><textarea id="wInvasive" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-xs text-gray-300 mb-1">Preuves POUR</label><textarea id="wProofsFor" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-xs text-gray-300 mb-1">Preuves CONTRE</label><textarea id="wProofsAgainst" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-xs text-gray-300 mb-1">Pire scenario</label><textarea id="wWorst" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-xs text-gray-300 mb-1">Plus probable</label><textarea id="wProbable" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-xs text-gray-300 mb-1">Meilleur</label><textarea id="wBest" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><div><label class="block text-xs text-gray-300 mb-1">Conclusion</label><textarea id="wConclusion" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2"></textarea></div><button onclick="submitDecontamination()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-check mr-2"></i>Valider</button></div>'}
+  else if(type==='influence'){t.innerHTML='<i class="fas fa-bullseye mr-1"></i>Cercle d\\'influence';c.innerHTML='<div class="space-y-3"><textarea id="iConcerns" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="4" placeholder="Tes preoccupations (une par ligne)"></textarea><textarea id="iReflections" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="3" placeholder="Que choisis-tu de relacher ?"></textarea><button onclick="submitInfluenceCircle()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-check mr-2"></i>Valider</button></div>'}
+  else if(type==='worry'){t.innerHTML='<i class="fas fa-box mr-1"></i>Boite a soucis';c.innerHTML='<div class="space-y-3"><textarea id="wItems" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="4" placeholder="Ce que tu craignais vs ce qui s\\'est passe"></textarea><textarea id="wInsight" class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="3" placeholder="Insight global"></textarea><button onclick="submitWorryReview()" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-check mr-2"></i>Valider</button></div>'}}
 function closeWeeklyModal(){document.getElementById('weeklyModal').classList.add('hidden');document.getElementById('weeklyModal').classList.remove('flex')}
 
 async function submitDecontamination(){
-  const inv=document.getElementById('wInvasive').value;if(!inv){showToast('\\u26A0','Pensee requise');return}
+  const inv=document.getElementById('wInvasive').value;if(!inv){showToast('\\u26A0','Requise');return}
   try{const r=await fetch(API+'/api/weekly/decontamination',{method:'POST',headers:headers(),body:JSON.stringify({invasive_thought:inv,proofs_for:JSON.stringify(document.getElementById('wProofsFor').value.split(',').map(s=>s.trim()).filter(Boolean)),proofs_against:JSON.stringify(document.getElementById('wProofsAgainst').value.split(',').map(s=>s.trim()).filter(Boolean)),scenario_worst:document.getElementById('wWorst').value,scenario_probable:document.getElementById('wProbable').value,scenario_best:document.getElementById('wBest').value,conclusion:document.getElementById('wConclusion').value})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeWeeklyModal();showToast('\\u{1F9F9}','Decontamination validee ! +30 XP');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeWeeklyModal();showToast('\\u{1F9F9}','+30 XP !');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
 async function submitInfluenceCircle(){
-  const c=document.getElementById('iConcerns').value;if(!c){showToast('\\u26A0','Preoccupations requises');return}
+  const c=document.getElementById('iConcerns').value;if(!c){showToast('\\u26A0','Requise');return}
   try{const r=await fetch(API+'/api/weekly/influence-circle',{method:'POST',headers:headers(),body:JSON.stringify({concerns:c,reflections:document.getElementById('iReflections').value})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeWeeklyModal();showToast('\\u{1F3AF}','Cercle valide ! +25 XP');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeWeeklyModal();showToast('\\u{1F3AF}','+25 XP !');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
 async function submitWorryReview(){
-  const items=document.getElementById('wItems').value;if(!items){showToast('\\u26A0','Soucis requis');return}
+  const items=document.getElementById('wItems').value;if(!items){showToast('\\u26A0','Requis');return}
   try{const r=await fetch(API+'/api/weekly/worry-review',{method:'POST',headers:headers(),body:JSON.stringify({worried_items:items,overall_insight:document.getElementById('wInsight').value})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeWeeklyModal();showToast('\\u{1F4E6}','Bilan valide ! +25 XP');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeWeeklyModal();showToast('\\u{1F4E6}','+25 XP !');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
-// === QUESTS ===
-async function loadQuests(){
-  try{const r=await fetch(API+'/api/quest/list',{headers:headers()});const d=await r.json();const el=document.getElementById('questList');
-  if(!d.quests?.length){el.innerHTML='<div class="card rounded-2xl p-8 text-center"><div class="text-4xl mb-3">\\u{1F52E}</div><h3 class="font-semibold mb-2">Les quetes emergent de tes donnees</h3><p class="text-sm text-gray-400">Continue tes check-ins.</p></div>';return}
+// === PATTERNS VIEW (opened from dashboard) ===
+function openPatternsView(){
+  const m=document.getElementById('questModal');m.classList.remove('hidden');m.classList.add('flex');
+  document.getElementById('questTitle').innerHTML='<i class="fas fa-brain mr-1"></i>Patterns';
+  document.getElementById('questContent').innerHTML='<div id="patternListView" class="space-y-3"><p class="text-xs text-gray-500">Chargement...</p></div>';
+  loadPatternsInModal();
+}
+
+async function loadPatternsInModal(){
+  try{const r=await fetch(API+'/api/pattern/list',{headers:headers()});const d=await r.json();const el=document.getElementById('patternListView');
+  if(!d.patterns?.length){el.innerHTML='<p class="text-xs text-gray-500">Aucun pattern.</p><div class="flex gap-2 mt-3"><button onclick="triggerAnalysis()" class="flex-1 py-2 bg-violet-600/30 hover:bg-violet-600/50 rounded-lg text-xs font-medium"><i class="fas fa-brain mr-1"></i>Analyser</button><button onclick="openSelfDeclare()" class="flex-1 py-2 bg-violet-600/30 hover:bg-violet-600/50 rounded-lg text-xs font-medium"><i class="fas fa-hand-point-up mr-1"></i>Autodeclarer</button></div>';return}
+  let h='';for(const p of d.patterns){const sc={detected:'text-yellow-400',active:'text-blue-400',maintenance:'text-green-400',resolved:'text-gray-400'};const sl={detected:'Detecte',active:'Actif',maintenance:'Maintenance',resolved:'Resolu'};
+    const ev=JSON.parse(p.evidence||'[]');h+='<div class="card rounded-lg p-3"><div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-xs">'+p.pattern_name+'</h3><span class="text-[10px] '+(sc[p.status]||'')+'">'+(sl[p.status]||p.status)+'</span></div><p class="text-[10px] text-gray-400">Confiance: '+Math.round(p.confidence*100)+'%</p>'+(ev.length?'<div class="text-[9px] text-gray-500 mt-1">'+ev.slice(0,2).map(e=>'\\u2022 '+e).join('<br>')+'</div>':'')+'</div>'}
+  h+='<div class="flex gap-2 mt-3"><button onclick="triggerAnalysis()" class="flex-1 py-2 bg-violet-600/30 hover:bg-violet-600/50 rounded-lg text-xs font-medium"><i class="fas fa-brain mr-1"></i>Relancer</button><button onclick="openSelfDeclare()" class="flex-1 py-2 bg-violet-600/30 hover:bg-violet-600/50 rounded-lg text-xs font-medium"><i class="fas fa-hand-point-up mr-1"></i>Autodeclarer</button></div>';
+  el.innerHTML=h}catch(e){}}
+
+async function triggerAnalysis(){showToast('\\u{1F9E0}','Analyse...');try{const r=await fetch(API+'/api/pattern/analyze',{method:'POST',headers:headers()});const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}if(d.new_patterns?.length>0)showToast('\\u{1F3AF}',d.new_patterns.length+' pattern(s) !');else showToast('\\u{1F50D}','Rien de nouveau');loadPatternsInModal();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+
+async function openSelfDeclare(){const m=document.getElementById('selfDeclareModal');m.classList.remove('hidden');m.classList.add('flex');
+  try{const r=await fetch(API+'/api/pattern/definitions');const d=await r.json();document.getElementById('selfDeclareContent').innerHTML=d.patterns.map(p=>'<button onclick="selfDeclare(\\''+p.key+'\\',\\''+p.name.replace(/'/g,"\\\\'")+'\\')" class="w-full card rounded-lg p-3 text-left hover:border-violet-500/50 transition-all"><h4 class="font-semibold text-xs">'+p.name+'</h4><p class="text-[10px] text-gray-400 mt-0.5">'+p.description+'</p><p class="text-[10px] text-violet-300 mt-1">'+p.quests_count+' quetes</p></button>').join('')}catch(e){}}
+function closeSelfDeclare(){document.getElementById('selfDeclareModal').classList.add('hidden');document.getElementById('selfDeclareModal').classList.remove('flex')}
+async function selfDeclare(k,n){try{const r=await fetch(API+'/api/pattern/self-declare',{method:'POST',headers:headers(),body:JSON.stringify({pattern_key:k})});const d=await r.json();if(d.error){showToast('\\u26A0',d.error);return}closeSelfDeclare();showToast('\\u{1F3AF}','"'+n+'" active !');loadPatternsInModal();refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
+
+// === QUESTS VIEW (opened from dashboard) ===
+function openQuestsView(){
+  const m=document.getElementById('questModal');m.classList.remove('hidden');m.classList.add('flex');
+  document.getElementById('questTitle').innerHTML='<i class="fas fa-scroll mr-1"></i>Quetes';
+  document.getElementById('questContent').innerHTML='<div id="questListView" class="space-y-3"><p class="text-xs text-gray-500">Chargement...</p></div>';
+  loadQuestsInModal();
+}
+
+async function loadQuestsInModal(){
+  try{const r=await fetch(API+'/api/quest/list',{headers:headers()});const d=await r.json();const el=document.getElementById('questListView');
+  if(!d.quests?.length){el.innerHTML='<div class="text-center py-6"><div class="text-3xl mb-2">\\u{1F52E}</div><p class="text-xs text-gray-500">Les quetes emergent de tes patterns.</p></div>';return}
   el.innerHTML=d.quests.map(q=>{const xp=JSON.parse(q.xp_rewards||'{}');const xs=Object.entries(xp).map(([k,v])=>'+'+v+' '+k).join(', ');
-    return '<div class="card rounded-2xl p-5 cursor-pointer" onclick="openQuest('+q.id+','+JSON.stringify(JSON.stringify(q))+')"><div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center text-2xl">\\u2694\\uFE0F</div><div class="flex-1"><h3 class="font-semibold">'+q.quest_name+'</h3><p class="text-sm text-gray-400">'+q.description+'</p></div><div class="text-right"><div class="text-xs text-violet-300">'+xs+'</div><div class="text-xs text-gray-500">x'+(q.times_completed||0)+'</div></div></div></div>'}).join('')}catch(e){console.error(e)}}
+    return '<div class="card rounded-lg p-3 cursor-pointer" onclick="openQuest('+q.id+','+JSON.stringify(JSON.stringify(q))+')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-sm">\\u2694\\uFE0F</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs truncate">'+q.quest_name+'</h3><p class="text-[10px] text-gray-400 truncate">'+q.description+'</p></div><div class="text-right flex-shrink-0"><div class="text-[9px] text-violet-300">'+xs+'</div><div class="text-[9px] text-gray-500">x'+(q.times_completed||0)+'</div></div></div></div>'}).join('')}catch(e){}}
 
 function openQuest(id,qs){const q=JSON.parse(qs);const m=document.getElementById('questModal');m.classList.remove('hidden');m.classList.add('flex');document.getElementById('questTitle').innerHTML='\\u2694\\uFE0F '+q.quest_name;
-  const ps=q.prompts||[];let h='<p class="text-sm text-gray-400 mb-4">'+q.description+'</p><div class="space-y-4">';
-  ps.forEach((p,i)=>{h+='<div><label class="block text-sm text-gray-300 mb-1">'+p+'</label><textarea class="quest-response w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="2" data-prompt="'+i+'"></textarea></div>'});
-  h+='<button onclick="submitQuest('+id+')" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold transition-all"><i class="fas fa-check mr-2"></i>Completer</button></div>';
+  const ps=q.prompts||[];let h='<p class="text-xs text-gray-400 mb-3">'+q.description+'</p><div class="space-y-3">';
+  ps.forEach((p,i)=>{h+='<div><label class="block text-xs text-gray-300 mb-1">'+p+'</label><textarea class="quest-response w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="2" data-prompt="'+i+'"></textarea></div>'});
+  h+='<button onclick="submitQuest('+id+')" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-check mr-2"></i>Completer</button></div>';
   document.getElementById('questContent').innerHTML=h}
 function closeQuestModal(){document.getElementById('questModal').classList.add('hidden');document.getElementById('questModal').classList.remove('flex')}
 
 async function submitQuest(qid){
   const resp={};document.querySelectorAll('.quest-response').forEach(el=>{resp[el.dataset.prompt]=el.value});
   try{const r=await fetch(API+'/api/quest/complete',{method:'POST',headers:headers(),body:JSON.stringify({quest_id:qid,responses:resp})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeQuestModal();showToast('\\u2694\\uFE0F','Quete completee: '+d.quest_name);refreshProfile();loadQuests()}catch(e){showToast('\\u274C','Erreur')}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeQuestModal();showToast('\\u2694\\uFE0F','Quete: '+d.quest_name);refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
-// === PATTERNS ===
-async function loadPatterns(){
-  try{const r=await fetch(API+'/api/pattern/list',{headers:headers()});const d=await r.json();const el=document.getElementById('patternList');
-  if(!d.patterns?.length){el.innerHTML='<p class="text-gray-500 text-sm">Aucun pattern detecte.</p><button onclick="triggerAnalysis()" class="mt-4 px-6 py-3 bg-violet-600/30 hover:bg-violet-600/50 rounded-xl font-medium transition-all text-sm"><i class="fas fa-brain mr-2"></i>Lancer analyse</button>';return}
-  el.innerHTML=d.patterns.map(p=>{const sc={detected:'text-yellow-400',active:'text-blue-400',maintenance:'text-green-400',resolved:'text-gray-400'};const sl={detected:'Detecte',active:'Actif',maintenance:'Maintenance',resolved:'Resolu'};
-    const ev=JSON.parse(p.evidence||'[]');return '<div class="card rounded-2xl p-5"><div class="flex items-center justify-between mb-2"><h3 class="font-semibold">'+p.pattern_name+'</h3><span class="text-xs '+(sc[p.status]||'')+'">'+( sl[p.status]||p.status)+'</span></div><p class="text-sm text-gray-400 mb-2">Confiance: '+Math.round(p.confidence*100)+'%</p>'+(ev.length?'<div class="text-xs text-gray-500">'+ev.slice(0,3).map(e=>'\\u2022 '+e).join('<br>')+'</div>':'')+'</div>'}).join('')+
-  '<button onclick="triggerAnalysis()" class="mt-4 px-6 py-3 bg-violet-600/30 hover:bg-violet-600/50 rounded-xl font-medium transition-all text-sm"><i class="fas fa-brain mr-2"></i>Relancer</button>'}catch(e){console.error(e)}}
+// === RITUALS VIEW (opened from dashboard) ===
+function openRitualsView(){
+  const m=document.getElementById('questModal');m.classList.remove('hidden');m.classList.add('flex');
+  document.getElementById('questTitle').innerHTML='<i class="fas fa-gem mr-1"></i>Rituels';
+  document.getElementById('questContent').innerHTML='<div id="ritualListView" class="space-y-3"><p class="text-xs text-gray-500">Chargement...</p></div>';
+  loadRitualsInModal();
+}
 
-async function triggerAnalysis(){showToast('\\u{1F9E0}','Analyse...');try{const r=await fetch(API+'/api/pattern/analyze',{method:'POST',headers:headers()});const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}if(d.new_patterns?.length>0)showToast('\\u{1F3AF}',d.new_patterns.length+' pattern(s) !');else showToast('\\u{1F50D}','Pas de nouveau pattern');loadPatterns();loadQuests()}catch(e){showToast('\\u274C','Erreur')}}
-
-async function openSelfDeclare(){const m=document.getElementById('selfDeclareModal');m.classList.remove('hidden');m.classList.add('flex');
-  try{const r=await fetch(API+'/api/pattern/definitions');const d=await r.json();document.getElementById('selfDeclareContent').innerHTML=d.patterns.map(p=>'<button onclick="selfDeclare(\\''+p.key+'\\',\\''+p.name.replace(/'/g,"\\\\'")+'\\')" class="w-full card rounded-xl p-4 text-left hover:border-violet-500/50 transition-all"><h4 class="font-semibold text-sm">'+p.name+'</h4><p class="text-xs text-gray-400 mt-1">'+p.description+'</p><p class="text-xs text-violet-300 mt-2">'+p.quests_count+' quetes</p></button>').join('')}catch(e){}}
-function closeSelfDeclare(){document.getElementById('selfDeclareModal').classList.add('hidden');document.getElementById('selfDeclareModal').classList.remove('flex')}
-async function selfDeclare(k,n){try{const r=await fetch(API+'/api/pattern/self-declare',{method:'POST',headers:headers(),body:JSON.stringify({pattern_key:k})});const d=await r.json();if(d.error){showToast('\\u26A0',d.error);return}closeSelfDeclare();showToast('\\u{1F3AF}','Pattern "'+n+'" active !');loadPatterns();loadQuests()}catch(e){showToast('\\u274C','Erreur')}}
-
-// === RITUALS ===
-async function loadRituals(){
-  try{const r=await fetch(API+'/api/ritual/available',{headers:headers()});const d=await r.json();const el=document.getElementById('ritualList');
+async function loadRitualsInModal(){
+  try{const r=await fetch(API+'/api/ritual/available',{headers:headers()});const d=await r.json();const el=document.getElementById('ritualListView');
   const fe={monthly:'\\u{1F4C5}',quarterly:'\\u{1F5D3}',yearly:'\\u{1F386}'};const fl={monthly:'Mensuel',quarterly:'Trimestriel',yearly:'Annuel'};
-  let h='';if(d.available?.length>0){h+=d.available.map(r=>{const xs=Object.entries(r.xp).map(([k,v])=>'+'+v+' '+k).join(', ');return '<div class="card rounded-2xl p-5 cursor-pointer" onclick="startRitual(\\''+r.key+'\\',\\''+r.name.replace(/'/g,"\\\\'")+'\\'  ,\\''+r.frequency+'\\')"><div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center text-2xl">'+(fe[r.frequency]||'\\u{1F48E}')+'</div><div class="flex-1"><h3 class="font-semibold">'+r.name+'</h3><p class="text-xs text-gray-400">'+(fl[r.frequency]||'')+'</p></div><div class="text-xs text-violet-300">'+xs+'</div></div></div>'}).join('')}
-  if(d.locked?.length>0){h+='<h3 class="text-sm font-semibold text-gray-500 mt-6 mb-3">\\u{1F512} Bloques</h3>';h+=d.locked.map(r=>'<div class="card rounded-2xl p-5 opacity-50"><div class="flex items-center gap-3"><div class="w-12 h-12 rounded-xl bg-gray-700/50 flex items-center justify-center text-2xl">\\u{1F512}</div><div><h3 class="font-semibold">'+r.name+'</h3><p class="text-xs text-gray-500">Niveau '+r.min_level+'</p></div></div></div>').join('')}
-  if(!h)h='<div class="card rounded-2xl p-8 text-center"><div class="text-4xl mb-3">\\u{1F512}</div><h3 class="font-semibold mb-2">Niveau 5 requis</h3></div>';
-  el.innerHTML=h}catch(e){console.error(e)}}
+  let h='';if(d.available?.length>0){h+=d.available.map(r=>{const xs=Object.entries(r.xp).map(([k,v])=>'+'+v+' '+k).join(', ');return '<div class="card rounded-lg p-3 cursor-pointer" onclick="startRitual(\\''+r.key+'\\',\\''+r.name.replace(/'/g,"\\\\'")+'\\'  ,\\''+r.frequency+'\\')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-sm">'+(fe[r.frequency]||'\\u{1F48E}')+'</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">'+r.name+'</h3><p class="text-[10px] text-gray-400">'+(fl[r.frequency]||'')+'</p></div><div class="text-[10px] text-violet-300 flex-shrink-0">'+xs+'</div></div></div>'}).join('')}
+  if(d.locked?.length>0){h+='<div class="section-title mt-4">\\u{1F512} Bloques</div>';h+=d.locked.map(r=>'<div class="card rounded-lg p-3 opacity-40"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-gray-700/50 flex items-center justify-center text-sm">\\u{1F512}</div><div><h3 class="font-semibold text-xs">'+r.name+'</h3><p class="text-[10px] text-gray-500">Nv.'+r.min_level+'</p></div></div></div>').join('')}
+  if(!h)h='<div class="text-center py-6"><div class="text-3xl mb-2">\\u{1F512}</div><p class="text-xs text-gray-500">Nv.5 requis</p></div>';
+  el.innerHTML=h}catch(e){}}
 
 async function startRitual(k,n,f){showToast('\\u{1F48E}','Preparation...');try{const r=await fetch(API+'/api/ritual/start',{method:'POST',headers:headers(),body:JSON.stringify({ritual_key:k})});const d=await r.json();
-  const m=document.getElementById('questModal');m.classList.remove('hidden');m.classList.add('flex');document.getElementById('questTitle').innerHTML='\\u{1F48E} '+n;
-  const ps=d.prompts||[];let h='<div class="space-y-4">';ps.forEach((p,i)=>{h+='<div><label class="block text-sm text-gray-300 mb-1">'+p+'</label><textarea class="ritual-response w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-violet-500 focus:outline-none resize-none" rows="3" data-prompt="'+i+'"></textarea></div>'});
-  h+='<button onclick="submitRitual(\\''+k+'\\',\\''+n.replace(/'/g,"\\\\'")+'\\'  ,\\''+f+'\\','+JSON.stringify(JSON.stringify(ps))+')" class="w-full py-3 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold transition-all"><i class="fas fa-gem mr-2"></i>Terminer</button></div>';
+  document.getElementById('questTitle').innerHTML='\\u{1F48E} '+n;
+  const ps=d.prompts||[];let h='<div class="space-y-3">';ps.forEach((p,i)=>{h+='<div><label class="block text-xs text-gray-300 mb-1">'+p+'</label><textarea class="ritual-response w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs focus:border-violet-500 focus:outline-none resize-none" rows="3" data-prompt="'+i+'"></textarea></div>'});
+  h+='<button onclick="submitRitual(\\''+k+'\\',\\''+n.replace(/'/g,"\\\\'")+'\\'  ,\\''+f+'\\','+JSON.stringify(JSON.stringify(ps))+')" class="w-full py-2.5 bg-violet-600 hover:bg-violet-500 rounded-lg font-bold text-sm transition-all"><i class="fas fa-gem mr-2"></i>Terminer</button></div>';
   document.getElementById('questContent').innerHTML=h}catch(e){showToast('\\u274C','Erreur')}}
 
 async function submitRitual(k,n,f,psStr){const content={};document.querySelectorAll('.ritual-response').forEach(el=>{content[el.dataset.prompt]=el.value});
   try{const r=await fetch(API+'/api/ritual/complete',{method:'POST',headers:headers(),body:JSON.stringify({ritual_key:k,ritual_name:n,frequency:f,content,prompts:JSON.parse(psStr)})});
-  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeQuestModal();showToast('\\u{1F48E}','Rituel complete ! XP massif !');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
-
-// === HISTORY ===
-async function loadHistory(){
-  try{const r=await fetch(API+'/api/me/history?days=14',{headers:headers()});const d=await r.json();const el=document.getElementById('historyContent');
-  let h='<h3 class="font-semibold mb-3">14 derniers jours</h3>';
-  if(d.xp_history?.length>0){h+='<div class="card rounded-2xl p-5 mb-4"><h4 class="font-medium text-sm mb-3 text-violet-300">XP</h4><div class="space-y-2">';
-    for(const x of d.xp_history.slice(0,20)){const t=(x.lucidity_xp||0)+(x.resonance_xp||0)+(x.liberty_xp||0)+(x.connection_xp||0)+(x.action_xp||0);const dt=new Date(x.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});h+='<div class="flex items-center justify-between text-xs"><span class="text-gray-400">'+dt+'</span><span>'+(x.description||x.source_type)+'</span><span class="text-violet-300">+'+t+' XP</span></div>'}h+='</div></div>'}
-  if(d.captures?.length>0){h+='<div class="card rounded-2xl p-5 mb-4"><h4 class="font-medium text-sm mb-3 text-violet-300">Captures</h4><div class="space-y-2">';
-    for(const c of d.captures.slice(0,10)){const dt=new Date(c.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});h+='<div class="p-3 bg-white/5 rounded-lg"><div class="flex items-center justify-between text-xs text-gray-400 mb-1"><span>'+dt+'</span><span>'+(c.emotion||'')+' | '+(c.category||'')+'</span></div><p class="text-sm">'+c.content+'</p></div>'}h+='</div></div>'}
-  if(!d.xp_history?.length&&!d.captures?.length)h+='<p class="text-gray-500 text-sm">Aucune donnee. Commence par un check-in !</p>';
-  el.innerHTML=h}catch(e){console.error(e)}}
+  const d=await r.json();if(d.error){showToast('\\u274C',d.error);return}closeQuestModal();showToast('\\u{1F48E}','Rituel complete !');refreshProfile()}catch(e){showToast('\\u274C','Erreur')}}
 
 // === UTILS ===
 async function refreshProfile(){try{const r=await fetch(API+'/api/me/profile',{headers:headers()});if(r.ok){userData=await r.json();renderDashboard()}}catch(e){}}
-function showToast(i,m){const t=document.getElementById('toast');document.getElementById('toastIcon').textContent=i;document.getElementById('toastMsg').textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),4000)}
+function showToast(i,m){const t=document.getElementById('toast');document.getElementById('toastIcon').textContent=i;document.getElementById('toastMsg').textContent=m;t.classList.remove('hidden');setTimeout(()=>t.classList.add('hidden'),3500)}
 function logout(){localStorage.removeItem('token');localStorage.removeItem('user');window.location.href='/'}
 init();
 `;
