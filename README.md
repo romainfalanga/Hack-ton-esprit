@@ -84,13 +84,24 @@ Les pages suivantes sont integrees dans la page **Accueil** avec deblocage progr
 - **Frontend** : HTML/JS/TailwindCSS (inline)
 - **Base de donnees** : Cloudflare D1 (SQLite) -- 21 tables
 - **IA** : OpenRouter (Gemini 2.5 Flash pour analyses profondes, 2.0 Flash pour taches legeres)
-- **CI/CD** : GitHub -> Cloudflare Workers (deploiement auto via Git)
+- **CI/CD** : GitHub Actions -> Cloudflare Workers (deploiement automatique sur push main)
 
 ## URLs
-- **Production** : https://hack-ton-esprit.romainfalanga83.workers.dev
+- **Production** : https://hacktonesprit.fr (domaine personnalise)
+- **Workers** : https://hack-ton-esprit.romainfalanga83.workers.dev
 - **GitHub** : https://github.com/romainfalanga/Hack-ton-esprit
 
-## Configuration Build (Dashboard Cloudflare)
+## CI/CD - Deploiement automatique
+Le fichier `.github/workflows/deploy.yml` declenche automatiquement :
+1. Installation des dependances (`npm ci`)
+2. Build du projet (`npm run build`)
+3. Deploiement sur Cloudflare Workers (`wrangler deploy`)
+
+**Secrets GitHub requis** :
+- `CLOUDFLARE_API_TOKEN` -- Token API Cloudflare
+- `CLOUDFLARE_ACCOUNT_ID` -- ID du compte Cloudflare
+
+## Configuration Build
 - **Build command** : `npm run build`
 - **Deploy command** : `npx wrangler deploy`
 
@@ -102,6 +113,9 @@ npm run dev:sandbox
 
 # Deploiement manuel
 npm run deploy
+
+# Deploiement auto : push sur main
+git push origin main
 ```
 
 ## API Endpoints
@@ -141,33 +155,33 @@ npm run deploy
 - `POST /api/ritual/start` -- Demarrer (IA)
 - `POST /api/ritual/complete` -- Completer
 
-**Ligne de Vie** (nouveau)
+**Ligne de Vie**
 - `POST /api/lifeline/event` -- Ajouter evenement
 - `GET /api/lifeline/events` -- Liste (avec emotions)
 - `PUT /api/lifeline/event/:id` -- Modifier
 - `DELETE /api/lifeline/event/:id` -- Supprimer
 
-**Profil Psychologique** (nouveau)
+**Profil Psychologique**
 - `GET /api/psych/profile` -- Traits + dernier snapshot
 - `POST /api/psych/generate` -- Generer/MaJ profil (IA)
 
-**Arbre des Pensees** (nouveau)
+**Arbre des Pensees**
 - `GET /api/thought/tree` -- Branches + pensees
 - `POST /api/thought/categorize` -- Categoriser captures/checkins (IA)
 - `POST /api/thought/branch` -- Creer branche
 
-**Micro-habitudes** (nouveau)
+**Micro-habitudes**
 - `GET /api/habits/list` -- Liste + statut today
 - `POST /api/habits/add` -- Ajouter
 - `POST /api/habits/log` -- Logger completion
 - `PUT /api/habits/:id/status` -- Changer statut
 - `DELETE /api/habits/:id` -- Supprimer
 
-**Videographie** (nouveau)
+**Videographie**
 - `POST /api/video/submit` -- Envoyer resume (IA)
 - `GET /api/video/list` -- Historique
 
-**Lettres** (nouveau)
+**Lettres**
 - `POST /api/letter/write` -- Ecrire
 - `GET /api/letter/list` -- Liste
 
@@ -177,3 +191,8 @@ users, user_stats, checkins, captures, decontaminations, influence_circles, worr
 ## Variables d'environnement
 - `OPENROUTER_API_KEY` -- Cle API OpenRouter (secret Cloudflare)
 - `DB` -- Binding D1 (configure dans wrangler.jsonc)
+
+## Domaine personnalise
+- **Domaine** : hacktonesprit.fr
+- **Configuration** : Route Worker via Cloudflare DNS
+- Voir les instructions de configuration dans le guide de deploiement
