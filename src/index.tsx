@@ -1692,14 +1692,14 @@ function getAppHTML(): string {
   <!-- NAV BAR -->
   <nav class="sticky top-0 z-30 bg-gray-900/95 backdrop-blur-md border-b border-white/10">
     <div class="max-w-5xl mx-auto px-3 flex items-center justify-between h-12">
-      <span class="font-bold text-sm text-white/80 hidden sm:block">Hack Ton Esprit</span>
+      <span class="font-bold text-sm text-white/80">Hack Ton Esprit</span>
       <div class="desktop-tabs flex items-center gap-0.5 mx-auto sm:mx-0">
         <button onclick="showTab('chat')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="chat"><i class="fas fa-comment-dots mr-1.5 text-violet-400"></i>Alma</button>
         <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="lifeline"><i class="fas fa-road mr-1.5 text-cyan-400"></i>Ligne de vie</button>
         <button onclick="showTab('psych')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="psych"><i class="fas fa-fingerprint mr-1.5 text-pink-400"></i>Profil Psy</button>
         <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="thoughttree"><i class="fas fa-diagram-project mr-1.5 text-teal-400"></i>Arbre</button>
       </div>
-      <button onclick="logout()" class="text-gray-500 hover:text-white text-sm p-1.5 hidden sm:block" title="Deconnexion"><i class="fas fa-right-from-bracket"></i></button>
+      <button onclick="logout()" class="text-gray-500 hover:text-white text-sm p-1.5" title="Deconnexion"><i class="fas fa-right-from-bracket"></i></button>
     </div>
   </nav>
 
@@ -1715,7 +1715,7 @@ function getAppHTML(): string {
       <button onclick="showTab('lifeline')" class="bottom-nav-btn" data-tab="lifeline"><i class="fas fa-road"></i><span>Vie</span></button>
       <button onclick="showTab('psych')" class="bottom-nav-btn" data-tab="psych"><i class="fas fa-fingerprint"></i><span>Profil</span></button>
       <button onclick="showTab('thoughttree')" class="bottom-nav-btn" data-tab="thoughttree"><i class="fas fa-diagram-project"></i><span>Arbre</span></button>
-      <button onclick="logout()" class="bottom-nav-btn" data-tab="logout"><i class="fas fa-right-from-bracket"></i><span>Sortir</span></button>
+
     </div>
   </div>
 
