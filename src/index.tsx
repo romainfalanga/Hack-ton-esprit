@@ -1337,16 +1337,14 @@ app.post('/api/chat/send', async (c) => {
   if (!message?.trim()) return c.json({ error: 'Message requis' }, 400);
   if (!apiKey) return c.json({ error: 'Cle API non configuree' }, 500);
 
-  let convId = conversation_id;
-
-  // Create conversation if needed
-  if (!convId) {
-    const conv = await db.prepare('INSERT INTO conversations (user_id) VALUES (?)').bind(user.id).run();
-    convId = conv.meta.last_row_id;
+  // Always use a single continuous conversation per user
+  let existing = await db.prepare('SELECT id, messages_count FROM conversations WHERE user_id = ? ORDER BY created_at ASC LIMIT 1').bind(user.id).first() as any;
+  if (!existing) {
+    const newConv = await db.prepare('INSERT INTO conversations (user_id) VALUES (?)').bind(user.id).run();
+    existing = { id: newConv.meta.last_row_id, messages_count: 0 };
   }
-
-  // Verify ownership
-  const conv = await db.prepare('SELECT id, messages_count FROM conversations WHERE id = ? AND user_id = ?').bind(convId, user.id).first() as any;
+  const convId = existing.id;
+  const conv = existing;
   if (!conv) return c.json({ error: 'Conversation non trouvee' }, 404);
 
   // Save user message
@@ -1564,7 +1562,6 @@ function getMainHTML(): string {
     </div>
     <div class="text-center max-w-3xl mx-auto relative z-10">
       <div class="mb-8">
-        <span class="text-6xl mb-4 block">&#129504;</span>
         <h1 class="text-5xl md:text-7xl font-black mb-4 glow">HACK<br><span class="text-violet-400">TON ESPRIT</span></h1>
         <p class="text-xl md:text-2xl text-gray-300 font-light">Le Jeu de Ta Vie</p>
       </div>
@@ -1573,13 +1570,7 @@ function getMainHTML(): string {
         <button onclick="showAuth('register')" class="px-8 py-4 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold text-lg transition-all transform hover:scale-105 card-glow"><i class="fas fa-rocket mr-2"></i>Commencer</button>
         <button onclick="showAuth('login')" class="px-8 py-4 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-lg transition-all border border-white/20"><i class="fas fa-sign-in-alt mr-2"></i>Connexion</button>
       </div>
-      <div class="grid grid-cols-5 gap-3 max-w-lg mx-auto">
-        <div class="text-center p-3 bg-white/5 rounded-xl"><span class="text-2xl">&#129504;</span><p class="text-xs text-gray-400 mt-1">Lucidite</p></div>
-        <div class="text-center p-3 bg-white/5 rounded-xl"><span class="text-2xl">&#128154;</span><p class="text-xs text-gray-400 mt-1">Resonance</p></div>
-        <div class="text-center p-3 bg-white/5 rounded-xl"><span class="text-2xl">&#128275;</span><p class="text-xs text-gray-400 mt-1">Liberte</p></div>
-        <div class="text-center p-3 bg-white/5 rounded-xl"><span class="text-2xl">&#128483;&#65039;</span><p class="text-xs text-gray-400 mt-1">Connexion</p></div>
-        <div class="text-center p-3 bg-white/5 rounded-xl"><span class="text-2xl">&#9889;</span><p class="text-xs text-gray-400 mt-1">Action</p></div>
-      </div>
+
     </div>
   </div>
 
@@ -1891,13 +1882,9 @@ function getLifelineTab(): string {
   return `<div id="tab-lifeline" class="tab-content hidden fade-in">
   <div class="flex items-center justify-between mb-4">
     <div><h2 class="text-lg font-bold"><i class="fas fa-timeline text-cyan-400 mr-2"></i>Ligne de vie</h2><p class="text-xs text-gray-400">Tes evenements majeurs</p></div>
-    <button onclick="openLifeEventForm()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 rounded-lg font-medium text-xs transition-all"><i class="fas fa-plus mr-1"></i>Ajouter</button>
+
   </div>
-  <div id="onboardingPrompt" class="hidden card rounded-xl p-4 mb-4 border-cyan-500/20">
-    <h3 class="font-bold text-cyan-300 text-sm mb-1"><i class="fas fa-info-circle mr-1"></i>Commence par 10 evenements</h3>
-    <p class="text-xs text-gray-400 mb-2">Ajoute les 10 moments cles. Bonus XP au 10eme !</p>
-    <div class="flex items-center gap-2"><div class="stat-bar flex-1"><div id="onboardingProgress" class="stat-fill bg-cyan-500" style="width:0%"></div></div><span id="onboardingCount" class="text-xs text-cyan-300">0/10</span></div>
-  </div>
+
   <div id="lifelineContent" class="space-y-3"></div>
 </div>`;
 }
@@ -1925,21 +1912,9 @@ function getChatTab(): string {
   return `<div id="tab-chat" class="tab-content fade-in">
   <div class="flex flex-col" style="height:calc(100dvh - 130px)">
     <!-- Chat header -->
-    <div class="flex items-center justify-between mb-2 flex-shrink-0">
-      <div class="flex items-center gap-2">
-        <div class="w-9 h-9 rounded-full bg-violet-500/30 flex items-center justify-center"><i class="fas fa-brain text-violet-300"></i></div>
-        <div><h2 class="font-bold text-sm">Alma <span class="text-[10px] text-violet-400/60 font-normal">ta psy IA</span></h2><p class="text-[10px] text-gray-400" id="chatStatus">En ligne</p></div>
-      </div>
-      <div class="flex items-center gap-2">
-        <button onclick="loadConversationHistory()" class="text-gray-400 hover:text-white text-sm p-1.5" title="Historique"><i class="fas fa-clock-rotate-left"></i></button>
-        <button onclick="startNewConversation()" class="text-gray-400 hover:text-white text-sm p-1.5" title="Nouvelle conversation"><i class="fas fa-plus"></i></button>
-      </div>
-    </div>
-
-    <!-- Conversation history sidebar (hidden by default) -->
-    <div id="chatHistoryPanel" class="hidden card rounded-xl p-3 mb-2 max-h-40 overflow-y-auto flex-shrink-0">
-      <h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Conversations</h4>
-      <div id="chatHistoryList" class="space-y-1"></div>
+    <div class="flex items-center gap-2 mb-2 flex-shrink-0">
+      <div class="w-9 h-9 rounded-full bg-violet-500/30 flex items-center justify-center"><i class="fas fa-brain text-violet-300"></i></div>
+      <div><h2 class="font-bold text-sm">Alma <span class="text-[10px] text-violet-400/60 font-normal">ta psy IA</span></h2><p class="text-[10px] text-gray-400" id="chatStatus">En ligne</p></div>
     </div>
 
     <!-- Messages area -->
@@ -1969,10 +1944,9 @@ function getPsychTab(): string {
   return `<div id="tab-psych" class="tab-content hidden fade-in">
   <div class="flex items-center justify-between mb-4">
     <div><h2 class="text-lg font-bold"><i class="fas fa-user-doctor text-pink-400 mr-2"></i>Profil Psychologique</h2><p class="text-xs text-gray-400">Analyse IA de ta personnalite</p></div>
-    <button onclick="generatePsychProfile()" class="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 rounded-lg font-medium text-xs transition-all" id="generatePsychBtn"><i class="fas fa-brain mr-1"></i>Generer</button>
   </div>
   <div id="psychSummary" class="hidden card rounded-xl p-4 mb-4 border-pink-500/20"></div>
-  <div id="psychTraits" class="space-y-2"><p class="text-gray-500 text-xs">Aucun profil genere. Ajoute des donnees puis genere ton profil.</p></div>
+  <div id="psychTraits" class="space-y-2"><p class="text-gray-500 text-xs">Ton profil se construit automatiquement au fil de tes discussions avec Alma.</p></div>
 </div>`;
 }
 
@@ -1980,11 +1954,10 @@ function getThoughtTreeTab(): string {
   return `<div id="tab-thoughttree" class="tab-content hidden fade-in">
   <div class="flex items-center justify-between mb-4">
     <div><h2 class="text-lg font-bold"><i class="fas fa-sitemap text-teal-400 mr-2"></i>Arbre des Pensees</h2><p class="text-xs text-gray-400">Organisation de tes reflexions</p></div>
-    <button onclick="categorizeThoughts()" class="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 rounded-lg font-medium text-xs transition-all"><i class="fas fa-wand-magic-sparkles mr-1"></i>Categoriser</button>
   </div>
   <div id="thoughtBranches" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4"></div>
   <h3 class="font-semibold text-sm mb-2">Pensees recentes</h3>
-  <div id="thoughtEntries" class="space-y-2"><p class="text-gray-500 text-xs">Aucune pensee categorisee. Clique sur "Categoriser".</p></div>
+  <div id="thoughtEntries" class="space-y-2"><p class="text-gray-500 text-xs">Tes pensees sont classees automatiquement au fil de tes discussions avec Alma.</p></div>
 </div>`;
 }
 
@@ -2226,29 +2199,24 @@ async function logHabit(id){
 async function deleteHabit(id){if(!confirm('Supprimer ?'))return;try{await fetch(API+'/api/habits/'+id,{method:'DELETE',headers:headers()});loadHabits()}catch(e){}}
 
 // === CHATBOT PSY IA ===
-let currentConvId=null;let chatInitialized=false;
-function initChat(){if(chatInitialized)return;chatInitialized=true;loadActiveConversation()}
+let chatInitialized=false;
+function initChat(){if(chatInitialized)return;chatInitialized=true;loadConversation()}
 
-async function loadActiveConversation(){
+async function loadConversation(){
   try{const r=await fetch(API+'/api/chat/conversations',{headers:headers()});const d=await r.json();
   const convs=d.conversations||[];
-  const active=convs.find(c=>c.status==='active');
-  if(active){currentConvId=active.id;await loadChatMessages(active.id)}
-  }catch(e){console.error('Chat init error:',e)}}
-
-async function loadChatMessages(convId){
-  try{const r=await fetch(API+'/api/chat/messages/'+convId,{headers:headers()});const d=await r.json();
-  const el=document.getElementById('chatMessages');
-  // Keep welcome message then add history
-  let h=el.innerHTML.split('</div>\\n    </div>')[0];
-  h=''; // Clear and rebuild
-  // Welcome message
-  h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">On se retrouve ! Alma est la. On continue ?</p></div></div>';
-  for(const m of (d.messages||[])){
-    if(m.role==='user'){h+='<div class="flex gap-2 justify-end"><div class="bg-violet-600/30 border border-violet-500/20 rounded-xl rounded-tr-sm p-3 max-w-[85%]"><p class="text-xs text-white leading-relaxed">'+escapeHtml(m.content)+'</p></div></div>'}
-    else{h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(m.content)+'</p></div></div>'}
-  }
-  el.innerHTML=h;el.scrollTop=el.scrollHeight}catch(e){}}
+  if(convs.length>0){
+    const convId=convs[0].id;
+    const mr=await fetch(API+'/api/chat/messages/'+convId,{headers:headers()});const md=await mr.json();
+    const msgs=md.messages||[];
+    if(msgs.length>0){
+      const el=document.getElementById('chatMessages');let h='';
+      for(const m of msgs){
+        if(m.role==='user'){h+='<div class="flex gap-2 justify-end"><div class="bg-violet-600/30 border border-violet-500/20 rounded-xl rounded-tr-sm p-3 max-w-[85%]"><p class="text-xs text-white leading-relaxed">'+escapeHtml(m.content)+'</p></div></div>'}
+        else{h+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(m.content)+'</p></div></div>'}
+      }
+      el.innerHTML=h;el.scrollTop=el.scrollHeight}
+  }}catch(e){console.error('Chat init:',e)}}
 
 function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\\n/g,'<br>')}
 function formatAIMessage(t){return escapeHtml(t).replace(/\\*\\*(.+?)\\*\\*/g,'<strong class="text-violet-300">$1</strong>').replace(/\\*(.+?)\\*/g,'<em>$1</em>')}
@@ -2256,48 +2224,22 @@ function formatAIMessage(t){return escapeHtml(t).replace(/\\*\\*(.+?)\\*\\*/g,'<
 async function sendChatMessage(){
   const input=document.getElementById('chatInput');const msg=input.value.trim();if(!msg)return;
   const btn=document.getElementById('chatSendBtn');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin text-sm"></i>';
-  // Add user message to UI
   const el=document.getElementById('chatMessages');
   el.innerHTML+='<div class="flex gap-2 justify-end"><div class="bg-violet-600/30 border border-violet-500/20 rounded-xl rounded-tr-sm p-3 max-w-[85%]"><p class="text-xs text-white leading-relaxed">'+escapeHtml(msg)+'</p></div></div>';
   input.value='';input.style.height='auto';el.scrollTop=el.scrollHeight;
-  // Show typing indicator
   const typingId='typing-'+Date.now();
-  el.innerHTML+='<div id="'+typingId+'" class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3"><p class="text-xs text-gray-500"><i class="fas fa-ellipsis fa-beat-fade"></i> Reflexion en cours...</p></div></div>';
+  el.innerHTML+='<div id="'+typingId+'" class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3"><p class="text-xs text-gray-500"><i class="fas fa-ellipsis fa-beat-fade"></i> Alma reflechit...</p></div></div>';
   el.scrollTop=el.scrollHeight;
   document.getElementById('chatStatus').textContent='Ecrit...';
-  try{const r=await fetch(API+'/api/chat/send',{method:'POST',headers:headers(),body:JSON.stringify({conversation_id:currentConvId,message:msg})});
+  try{const r=await fetch(API+'/api/chat/send',{method:'POST',headers:headers(),body:JSON.stringify({message:msg})});
   const d=await r.json();
-  // Remove typing indicator
   const ti=document.getElementById(typingId);if(ti)ti.remove();
   if(d.error){el.innerHTML+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-red-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-exclamation text-red-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 border-red-500/20"><p class="text-xs text-red-300">'+d.error+'</p></div></div>';el.scrollTop=el.scrollHeight;return}
-  if(!currentConvId)currentConvId=d.conversation_id;
-  // Add AI response
-  el.innerHTML+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(d.response)+'</p>'+(d.actions_executed>0?'<div class="flex items-center gap-1 mt-2 pt-2 border-t border-white/5"><i class="fas fa-wand-magic-sparkles text-[9px] text-violet-400"></i><span class="text-[9px] text-violet-400/70">'+d.actions_executed+' action(s) en arriere-plan</span></div>':'')+'</div></div>';
+  el.innerHTML+='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">'+formatAIMessage(d.response)+'</p></div></div>';
   el.scrollTop=el.scrollHeight;
-  if(d.xp)showToast('\\u{1F9E0}','+5 XP conversation !');
   document.getElementById('chatStatus').textContent='En ligne'}
   catch(e){const ti=document.getElementById(typingId);if(ti)ti.remove();el.innerHTML+='<div class="text-center text-xs text-red-400 py-2">Erreur de connexion</div>';document.getElementById('chatStatus').textContent='En ligne'}
   finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-paper-plane text-sm"></i>'}}
-
-async function startNewConversation(){currentConvId=null;chatInitialized=false;
-  const el=document.getElementById('chatMessages');
-  el.innerHTML='<div class="flex gap-2"><div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div><div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]"><p class="text-xs text-gray-300 leading-relaxed">Nouvelle conversation ! De quoi veux-tu parler ?</p></div></div>';
-  document.getElementById('chatHistoryPanel').classList.add('hidden');chatInitialized=true}
-
-async function loadConversationHistory(){
-  const panel=document.getElementById('chatHistoryPanel');
-  if(!panel.classList.contains('hidden')){panel.classList.add('hidden');return}
-  panel.classList.remove('hidden');
-  try{const r=await fetch(API+'/api/chat/conversations',{headers:headers()});const d=await r.json();
-  const el=document.getElementById('chatHistoryList');
-  if(!d.conversations?.length){el.innerHTML='<p class="text-[10px] text-gray-500">Aucune conversation.</p>';return}
-  el.innerHTML=d.conversations.map(c=>{const dt=new Date(c.updated_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-    return '<div class="flex items-center justify-between p-1.5 rounded-lg hover:bg-white/5 cursor-pointer transition-all'+(c.id===currentConvId?' bg-violet-500/10':'')+'" onclick="switchConversation('+c.id+')"><div class="flex-1 min-w-0 mr-2"><p class="text-[11px] truncate">'+(c.title||'Conversation')+'</p><p class="text-[9px] text-gray-500">'+dt+' | '+c.messages_count+' msg</p></div><button onclick="event.stopPropagation();deleteConversation('+c.id+')" class="text-gray-600 hover:text-red-400 text-[10px] flex-shrink-0"><i class="fas fa-trash"></i></button></div>'}).join('')}catch(e){}}
-
-async function switchConversation(id){currentConvId=id;await loadChatMessages(id);document.getElementById('chatHistoryPanel').classList.add('hidden')}
-async function deleteConversation(id){if(!confirm('Supprimer cette conversation ?'))return;
-  try{await fetch(API+'/api/chat/conversation/'+id,{method:'DELETE',headers:headers()});
-  if(id===currentConvId){currentConvId=null;startNewConversation()}loadConversationHistory()}catch(e){}}
 
 // === PSYCH PROFILE ===
 async function loadPsychProfile(){
