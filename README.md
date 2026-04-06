@@ -58,6 +58,27 @@ Introspections mensuelles, trimestrielles et annuelles au contenu personnalise.
 - Stocke avec date de lisibilite
 - XP: +10 Resonance +5 Lucidite
 
+## Navigation (v4)
+Navigation reduite a **6 onglets** : Accueil, Ligne de vie, Habitudes, Video, Profil Psy, Arbre de pensee.
+
+Les pages suivantes sont integrees dans la page **Accueil** avec deblocage progressif par niveau XP :
+- **Nv.1** : Check-in matin + Capture instantanee (toujours disponible)
+- **Nv.2** : Scan du soir
+- **Nv.3** : Exercices hebdomadaires (Decontamination, Cercle d'influence, Boite a soucis) + Stats detaillees
+- **Nv.4** : Detection de patterns + Quetes emergentes
+- **Nv.5** : Rituels de profondeur
+
+### Indicateurs de verrouillage
+- Badge pulsant avec icone cadenas et niveau requis
+- Overlay gradient avec blur sur les cartes verrouillees
+- Animation "shake" quand l'utilisateur tente d'acceder a du contenu verrouille
+- Animation "glow" quand un contenu se debloque
+- Toast informatif indiquant le nombre de niveaux restants
+
+### Responsive (Mobile / Desktop)
+- **Mobile** : Bottom navigation fixe avec indicateur actif, touch targets 44px+, FAB capture
+- **Desktop** : Top tabs avec bordure active, layout large
+
 ## Stack technique
 - **Backend** : Hono (Cloudflare Workers)
 - **Frontend** : HTML/JS/TailwindCSS (inline)
