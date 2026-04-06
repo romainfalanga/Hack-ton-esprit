@@ -1330,15 +1330,28 @@ function getAppHTML(): string {
     .emotion-chip:hover{transform:scale(1.05)}
     .emotion-chip.selected{background:rgba(139,92,246,.3)!important;border-color:#8b5cf6!important}
     /* Bottom nav for mobile */
-    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(15,12,41,.95);backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.1);padding-bottom:env(safe-area-inset-bottom)}
-    .bottom-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;font-size:10px;color:rgba(156,163,175,1);transition:all .2s;flex:1;min-width:0}
+    .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(15,12,41,.97);backdrop-filter:blur(20px);border-top:1px solid rgba(139,92,246,.15);padding-bottom:env(safe-area-inset-bottom)}
+    .bottom-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;font-size:10px;color:rgba(156,163,175,.7);transition:all .2s;flex:1;min-width:0;-webkit-tap-highlight-color:transparent;position:relative}
     .bottom-nav-btn.active{color:#c4b5fd}
     .bottom-nav-btn.active i{color:#a78bfa}
-    .bottom-nav-btn i{font-size:18px;transition:all .2s}
+    .bottom-nav-btn.active::before{content:'';position:absolute;top:-1px;left:25%;right:25%;height:2px;background:#a78bfa;border-radius:0 0 2px 2px}
+    .bottom-nav-btn i{font-size:20px;transition:all .2s}
     /* Locked feature card */
-    .locked-card{position:relative;overflow:hidden}
-    .locked-card::after{content:'';position:absolute;inset:0;background:rgba(15,12,41,.7);backdrop-filter:blur(2px);z-index:1}
+    .locked-card{position:relative;overflow:hidden;pointer-events:auto;cursor:pointer}
+    .locked-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(15,12,41,.75) 0%,rgba(30,27,75,.85) 100%);backdrop-filter:blur(3px);z-index:1;transition:all .3s}
+    .locked-card:hover::after{background:linear-gradient(135deg,rgba(15,12,41,.65) 0%,rgba(30,27,75,.75) 100%)}
     .locked-card .lock-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:2;text-align:center;padding:12px}
+    .lock-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.3);backdrop-filter:blur(4px)}
+    .lock-badge i{font-size:10px;color:rgba(167,139,250,.7)}
+    .lock-badge span{font-size:10px;font-weight:600;color:rgba(167,139,250,.8)}
+    @keyframes lockPulse{0%,100%{opacity:.7}50%{opacity:1}}
+    .lock-pulse{animation:lockPulse 2.5s ease-in-out infinite}
+    /* Unlocked animation */
+    @keyframes unlockGlow{from{box-shadow:0 0 0 0 rgba(139,92,246,.4)}to{box-shadow:0 0 20px 4px rgba(139,92,246,0)}}
+    .unlock-glow{animation:unlockGlow .8s ease-out}
+    @keyframes shake{0%,100%{transform:translateX(0)}15%,45%,75%{transform:translateX(-4px)}30%,60%,90%{transform:translateX(4px)}}
+    /* Mobile touch improvements */
+    @media(max-width:640px){.card{min-height:44px}.bottom-nav-btn{min-height:48px}}
     /* Capture FAB */
     .capture-fab{position:fixed;z-index:35;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);box-shadow:0 4px 20px rgba(139,92,246,.5);transition:all .3s;bottom:calc(72px + env(safe-area-inset-bottom));right:16px}
     .capture-fab:hover{transform:scale(1.1)}
@@ -1482,7 +1495,7 @@ function getAppHTML(): string {
 }
 
 // ============================================
-// TAB FRAGMENTS (v3 — Unified)
+// TAB FRAGMENTS (v4 — Enhanced Lock & Mobile)
 // ============================================
 function getAllTabsHTML(): string {
   return getDashboardTab() + getLifelineTab() + getHabitsTab() + getVideoTab() + getPsychTab() + getThoughtTreeTab();
@@ -1491,42 +1504,56 @@ function getAllTabsHTML(): string {
 function getDashboardTab(): string {
   return `<div id="tab-dashboard" class="tab-content fade-in">
   <!-- Header with XP ring -->
-  <div class="flex items-center gap-4 mb-5">
-    <div class="xp-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3"/><circle id="xpCircle" cx="18" cy="18" r="16" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="0 100" stroke-linecap="round"/></svg><div class="xp-ring-text"><span id="globalLevelNum" class="text-sm font-black text-violet-300">1</span><span class="text-[8px] text-gray-500 uppercase">Niveau</span></div></div>
-    <div class="flex-1 min-w-0"><h2 class="text-lg font-bold truncate">Salut, <span id="userName"></span></h2><p class="text-xs text-gray-400 truncate" id="awakeningTitle"></p><div class="stat-bar mt-2"><div id="xpBar" class="stat-fill bg-violet-500" style="width:0%"></div></div><p class="text-[10px] text-gray-500 mt-1"><span id="xpCurrent">0</span> / <span id="xpNext">100</span> XP</p></div>
+  <div class="flex items-center gap-4 mb-6">
+    <div class="xp-ring flex-shrink-0"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3"/><circle id="xpCircle" cx="18" cy="18" r="16" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="0 100" stroke-linecap="round"/></svg><div class="xp-ring-text"><span id="globalLevelNum" class="text-sm font-black text-violet-300">1</span><span class="text-[8px] text-gray-500 uppercase">Niveau</span></div></div>
+    <div class="flex-1 min-w-0">
+      <h2 class="text-lg font-bold truncate">Salut, <span id="userName"></span></h2>
+      <p class="text-xs text-gray-400 truncate" id="awakeningTitle"></p>
+      <div class="stat-bar mt-2"><div id="xpBar" class="stat-fill bg-violet-500" style="width:0%"></div></div>
+      <p class="text-[10px] text-gray-500 mt-1"><span id="xpCurrent">0</span> / <span id="xpNext">100</span> XP</p>
+    </div>
   </div>
 
   <!-- SECTION: Quotidien (Nv.1) — Always visible -->
   <div class="section-title flex items-center gap-2"><i class="fas fa-sun text-amber-400 text-[11px]"></i>Quotidien</div>
   <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-    <div id="morningCard" class="card rounded-xl p-3 cursor-pointer" onclick="openMorningModal()"><div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-sm"><i class="fas fa-sun text-amber-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Check-in matin</h3><p class="text-[10px] text-gray-500" id="morningStatus">En attente</p></div></div><div class="text-[10px] text-violet-300">+5 XP</div></div>
-    <div id="eveningCard" class="card rounded-xl p-3 cursor-pointer" data-unlock="2" onclick="handleLockedClick(2,'evening')"><div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-sm"><i class="fas fa-moon text-indigo-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Scan du soir</h3><p class="text-[10px] text-gray-500" id="eveningStatus">En attente</p></div></div><div class="text-[10px] text-violet-300">+5-15 XP</div></div>
-    <div class="card rounded-xl p-3 cursor-pointer" onclick="openCapture()"><div class="flex items-center gap-2 mb-2"><div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-sm"><i class="fas fa-bolt text-purple-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Capture</h3><p class="text-[10px] text-gray-500" id="captureCount">0</p></div></div><div class="text-[10px] text-violet-300">+2 XP</div></div>
+    <div id="morningCard" class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" onclick="openMorningModal()">
+      <div class="flex items-center gap-2.5 mb-2"><div class="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center"><i class="fas fa-sun text-amber-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Check-in matin</h3><p class="text-[10px] text-gray-500" id="morningStatus">A faire</p></div></div>
+      <div class="text-[10px] text-violet-400/80 font-medium">+5 XP resonance</div>
+    </div>
+    <div id="eveningCard" class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="2" onclick="handleLockedClick(2,'evening')">
+      <div class="flex items-center gap-2.5 mb-2"><div class="w-9 h-9 rounded-lg bg-indigo-500/20 flex items-center justify-center"><i class="fas fa-moon text-indigo-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Scan du soir</h3><p class="text-[10px] text-gray-500" id="eveningStatus">A faire</p></div></div>
+      <div class="text-[10px] text-violet-400/80 font-medium">+5-15 XP</div>
+    </div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" onclick="openCapture()">
+      <div class="flex items-center gap-2.5 mb-2"><div class="w-9 h-9 rounded-lg bg-purple-500/20 flex items-center justify-center"><i class="fas fa-bolt text-purple-400"></i></div><div class="min-w-0"><h3 class="font-semibold text-xs truncate">Capture</h3><p class="text-[10px] text-gray-500" id="captureCount">0 captures</p></div></div>
+      <div class="text-[10px] text-violet-400/80 font-medium">+2 XP lucidite</div>
+    </div>
   </div>
 
   <!-- SECTION: Hebdomadaire (Nv.3) -->
-  <div class="section-title flex items-center gap-2"><i class="fas fa-calendar-week text-blue-400 text-[11px]"></i>Hebdomadaire <span id="weeklyLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div class="section-title flex items-center gap-2"><i class="fas fa-calendar-week text-blue-400 text-[11px]"></i>Hebdomadaire <span id="weeklyLock" class="ml-1"></span></div>
   <div id="weeklySection" class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="3" onclick="handleLockedClick(3,'decontamination')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center text-base">&#129529;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Decontamination</h3><p class="text-[10px] text-gray-500">15 min</p></div><span class="text-[10px] text-violet-300">+30 XP</span></div></div>
-    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="3" onclick="handleLockedClick(3,'influence')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-base">&#127919;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Cercle d'influence</h3><p class="text-[10px] text-gray-500">10 min</p></div><span class="text-[10px] text-violet-300">+25 XP</span></div></div>
-    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="3" onclick="handleLockedClick(3,'worry')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-base">&#128230;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Boite a soucis</h3><p class="text-[10px] text-gray-500">10 min</p></div><span class="text-[10px] text-violet-300">+25 XP</span></div></div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="3" onclick="handleLockedClick(3,'decontamination')"><div class="flex items-center gap-2.5"><div class="w-9 h-9 rounded-lg bg-red-500/20 flex items-center justify-center text-base">&#129529;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Decontamination</h3><p class="text-[10px] text-gray-500">15 min | +30 XP</p></div><i class="fas fa-chevron-right text-[10px] text-gray-600"></i></div></div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="3" onclick="handleLockedClick(3,'influence')"><div class="flex items-center gap-2.5"><div class="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center text-base">&#127919;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Cercle d'influence</h3><p class="text-[10px] text-gray-500">10 min | +25 XP</p></div><i class="fas fa-chevron-right text-[10px] text-gray-600"></i></div></div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="3" onclick="handleLockedClick(3,'worry')"><div class="flex items-center gap-2.5"><div class="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center text-base">&#128230;</div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Boite a soucis</h3><p class="text-[10px] text-gray-500">10 min | +25 XP</p></div><i class="fas fa-chevron-right text-[10px] text-gray-600"></i></div></div>
   </div>
 
   <!-- SECTION: Patterns & Quetes (Nv.4+) -->
-  <div class="section-title flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-[11px]"></i>Patterns & Quetes <span id="patternsLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div class="section-title flex items-center gap-2"><i class="fas fa-brain text-pink-400 text-[11px]"></i>Patterns & Quetes <span id="patternsLock" class="ml-1"></span></div>
   <div id="patternsSection" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="4" onclick="handleLockedClick(4,'patterns')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-pink-500/20 flex items-center justify-center text-sm"><i class="fas fa-brain text-pink-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Mes patterns</h3><p class="text-[10px] text-gray-500" id="patternCount">0 detectes</p></div><span class="text-[10px] text-violet-300"><i class="fas fa-chevron-right"></i></span></div></div>
-    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="4" onclick="handleLockedClick(4,'quests')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center text-sm"><i class="fas fa-scroll text-violet-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Quetes actives</h3><p class="text-[10px] text-gray-500" id="questCount">0 disponibles</p></div><span class="text-[10px] text-violet-300"><i class="fas fa-chevron-right"></i></span></div></div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="4" onclick="handleLockedClick(4,'patterns')"><div class="flex items-center gap-2.5"><div class="w-9 h-9 rounded-lg bg-pink-500/20 flex items-center justify-center"><i class="fas fa-brain text-pink-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Mes patterns</h3><p class="text-[10px] text-gray-500" id="patternCount">0 detectes</p></div><i class="fas fa-chevron-right text-[10px] text-gray-600"></i></div></div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="4" onclick="handleLockedClick(4,'quests')"><div class="flex items-center gap-2.5"><div class="w-9 h-9 rounded-lg bg-violet-500/20 flex items-center justify-center"><i class="fas fa-scroll text-violet-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Quetes actives</h3><p class="text-[10px] text-gray-500" id="questCount">0 disponibles</p></div><i class="fas fa-chevron-right text-[10px] text-gray-600"></i></div></div>
   </div>
 
   <!-- SECTION: Rituels (Nv.5) -->
-  <div class="section-title flex items-center gap-2"><i class="fas fa-gem text-emerald-400 text-[11px]"></i>Rituels <span id="ritualsLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <div class="section-title flex items-center gap-2"><i class="fas fa-gem text-emerald-400 text-[11px]"></i>Rituels <span id="ritualsLock" class="ml-1"></span></div>
   <div id="ritualsSection" class="mb-6">
-    <div class="card rounded-xl p-3 cursor-pointer" data-unlock="5" onclick="handleLockedClick(5,'rituals')"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-sm"><i class="fas fa-gem text-emerald-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Introspections profondes</h3><p class="text-[10px] text-gray-500" id="ritualInfo">Mensuel, trimestriel, annuel</p></div><span class="text-[10px] text-violet-300"><i class="fas fa-chevron-right"></i></span></div></div>
+    <div class="card rounded-xl p-3.5 cursor-pointer active:scale-[.98] transition-transform" data-unlock="5" onclick="handleLockedClick(5,'rituals')"><div class="flex items-center gap-2.5"><div class="w-9 h-9 rounded-lg bg-emerald-500/20 flex items-center justify-center"><i class="fas fa-gem text-emerald-400"></i></div><div class="flex-1 min-w-0"><h3 class="font-semibold text-xs">Introspections profondes</h3><p class="text-[10px] text-gray-500" id="ritualInfo">Mensuel, trimestriel, annuel</p></div><i class="fas fa-chevron-right text-[10px] text-gray-600"></i></div></div>
   </div>
 
-  <!-- SECTION: Stats (Nv.3) -->
-  <div class="section-title flex items-center gap-2"><i class="fas fa-chart-bar text-cyan-400 text-[11px]"></i>Progression <span id="statsLock" class="text-[10px] text-gray-600 font-normal ml-1"></span></div>
+  <!-- SECTION: Stats -->
+  <div class="section-title flex items-center gap-2"><i class="fas fa-chart-bar text-cyan-400 text-[11px]"></i>Progression <span id="statsLock" class="ml-1"></span></div>
   <div id="statsSection">
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4" id="statsGrid"></div>
     <div id="historyPreview" class="card rounded-xl p-4 hidden" data-unlock="3"><h4 class="text-xs font-semibold text-gray-300 mb-3"><i class="fas fa-clock mr-1"></i>Activite recente</h4><div id="recentActivity" class="space-y-2"></div></div>
@@ -1651,8 +1678,15 @@ function showTab(t){
 
 // === LOCK SYSTEM ===
 function handleLockedClick(reqLevel,action){
-  if(userLevel<reqLevel){showToast('\\u{1F512}','Debloque au niveau '+reqLevel+' (tu es Nv.'+userLevel+')');return}
-  // Dispatch action
+  if(userLevel<reqLevel){
+    const diff=reqLevel-userLevel;
+    const msg=diff===1?'Encore 1 niveau !':'Encore '+diff+' niveaux';
+    showToast('\\u{1F512}','Nv.'+reqLevel+' requis ('+msg+')');
+    // Shake animation on the locked card
+    const card=event?.target?.closest('[data-unlock]');
+    if(card){card.style.animation='none';card.offsetHeight;card.style.animation='shake .4s ease-in-out'}
+    return;
+  }
   if(action==='evening')openEveningModal();
   else if(action==='decontamination')openWeeklyExercise('decontamination');
   else if(action==='influence')openWeeklyExercise('influence');
@@ -1667,19 +1701,24 @@ function applyLockStates(){
     const req=parseInt(el.dataset.unlock);
     if(userLevel<req){
       el.classList.add('locked-card');
-      // Add lock overlay if not present
       if(!el.querySelector('.lock-overlay')){
         const ov=document.createElement('div');ov.className='lock-overlay';
-        ov.innerHTML='<i class="fas fa-lock text-gray-500 text-lg mb-1"></i><span class="text-[10px] text-gray-500 font-medium">Nv.'+req+'</span>';
+        ov.innerHTML='<div class="lock-badge lock-pulse"><i class="fas fa-lock"></i><span>Nv.'+req+'</span></div>';
         el.appendChild(ov);
       }
     } else {
-      el.classList.remove('locked-card');
+      if(el.classList.contains('locked-card')){
+        el.classList.remove('locked-card');
+        el.classList.add('unlock-glow');
+        setTimeout(()=>el.classList.remove('unlock-glow'),800);
+      }
       const ov=el.querySelector('.lock-overlay');if(ov)ov.remove();
     }
   });
-  // Section headers
-  const setLock=(id,lv)=>{const el=document.getElementById(id);if(el)el.textContent=userLevel<lv?'\\u{1F512} Nv.'+lv:'';};
+  // Section lock indicators
+  const setLock=(id,lv)=>{const el=document.getElementById(id);if(!el)return;
+    if(userLevel<lv){el.innerHTML='<span class="lock-badge" style="display:inline-flex"><i class="fas fa-lock"></i><span>Nv.'+lv+'</span></span>'}
+    else{el.innerHTML=''}};
   setLock('weeklyLock',3);setLock('patternsLock',4);setLock('ritualsLock',5);setLock('statsLock',3);
 }
 
@@ -1704,11 +1743,11 @@ function renderDashboard(){
   const xpNxt=document.getElementById('xpNext');if(xpNxt)xpNxt.textContent=nextTh;
 
   // Daily status
-  document.getElementById('morningStatus').textContent=userData.today.morning_done?'\\u2705 Fait':'A faire';
-  document.getElementById('eveningStatus').textContent=userData.today.evening_done?'\\u2705 Fait':'A faire';
-  if(userData.today.morning_done)document.getElementById('morningCard').style.borderColor='rgba(34,197,94,.3)';
-  else document.getElementById('morningCard').style.borderColor='';
-  if(userData.today.evening_done){const ec=document.getElementById('eveningCard');if(ec)ec.style.borderColor='rgba(34,197,94,.3)'}
+  const mCard=document.getElementById('morningCard');const eCard=document.getElementById('eveningCard');
+  if(userData.today.morning_done){document.getElementById('morningStatus').innerHTML='<span class="text-green-400"><i class="fas fa-check-circle mr-0.5"></i>Fait</span>';if(mCard){mCard.style.borderColor='rgba(34,197,94,.3)';mCard.style.background='rgba(34,197,94,.05)'}}
+  else{document.getElementById('morningStatus').textContent='A faire';if(mCard){mCard.style.borderColor='';mCard.style.background=''}}
+  if(userData.today.evening_done){document.getElementById('eveningStatus').innerHTML='<span class="text-green-400"><i class="fas fa-check-circle mr-0.5"></i>Fait</span>';if(eCard){eCard.style.borderColor='rgba(34,197,94,.3)';eCard.style.background='rgba(34,197,94,.05)'}}
+  else{document.getElementById('eveningStatus').textContent='A faire';if(eCard){eCard.style.borderColor='';eCard.style.background=''}}
   document.getElementById('captureCount').textContent=(userData.counts.total_captures||0)+' captures';
   document.getElementById('patternCount').textContent=(userData.counts.active_patterns||0)+' detectes';
   document.getElementById('questCount').textContent=(userData.counts.active_quests||0)+' disponibles';
