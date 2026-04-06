@@ -1217,8 +1217,8 @@ REGLES :
 function selectModel(messagesCount: number, hasDeepContent: boolean): string {
   // Use powerful model most of the time for quality actions + analysis
   // Only use fast model for very long established conversations with light content
-  if (messagesCount < 20) return 'google/gemini-2.5-flash-preview-05-20';
-  if (hasDeepContent) return 'google/gemini-2.5-flash-preview-05-20';
+  if (messagesCount < 20) return 'google/gemini-2.5-flash';
+  if (hasDeepContent) return 'google/gemini-2.5-flash';
   return 'google/gemini-2.0-flash-001';
 }
 
@@ -1563,10 +1563,8 @@ function getMainHTML(): string {
     <div class="text-center max-w-3xl mx-auto relative z-10">
       <div class="mb-8">
         <h1 class="text-5xl md:text-7xl font-black mb-4 glow">HACK<br><span class="text-violet-400">TON ESPRIT</span></h1>
-        <p class="text-xl md:text-2xl text-gray-300 font-light">Le Jeu de Ta Vie</p>
-      </div>
-      <p class="text-lg text-gray-400 mb-12 max-w-xl mx-auto leading-relaxed">Un voyage gamifie vers la comprehension de soi. Observe tes schemas. Decouvre tes patterns. <span class="text-violet-300">Transforme ta vie.</span></p>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+        </div>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center mt-8">
         <button onclick="showAuth('register')" class="px-8 py-4 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold text-lg transition-all transform hover:scale-105 card-glow"><i class="fas fa-rocket mr-2"></i>Commencer</button>
         <button onclick="showAuth('login')" class="px-8 py-4 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-lg transition-all border border-white/20"><i class="fas fa-sign-in-alt mr-2"></i>Connexion</button>
       </div>
@@ -1668,10 +1666,7 @@ function getAppHTML(): string {
     @keyframes shake{0%,100%{transform:translateX(0)}15%,45%,75%{transform:translateX(-4px)}30%,60%,90%{transform:translateX(4px)}}
     /* Mobile touch improvements */
     @media(max-width:640px){.card{min-height:44px}.bottom-nav-btn{min-height:48px}}
-    /* Capture FAB */
-    .capture-fab{position:fixed;z-index:35;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);box-shadow:0 4px 20px rgba(139,92,246,.5);transition:all .3s;bottom:calc(72px + env(safe-area-inset-bottom));right:16px}
-    .capture-fab:hover{transform:scale(1.1)}
-    @media(min-width:768px){.capture-fab{bottom:24px;right:24px}}
+    
     /* Section headers */
     .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(156,163,175,.7);margin-bottom:12px;padding-left:4px}
     /* XP ring */
@@ -1694,21 +1689,17 @@ function getAppHTML(): string {
   </style>
 </head>
 <body class="gradient-bg text-white">
-  <!-- TOP BAR -->
-  <nav class="sticky top-0 z-30 bg-gray-900/90 backdrop-blur-md border-b border-white/10">
-    <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between">
-      <div class="flex items-center gap-2"><span class="font-bold text-sm sm:text-base">Hack Ton Esprit</span></div>
-      <div class="flex items-center gap-2 sm:gap-3">
-        <button onclick="logout()" class="text-gray-500 hover:text-white text-sm p-1" title="Deconnexion"><i class="fas fa-sign-out-alt"></i></button>
+  <!-- NAV BAR -->
+  <nav class="sticky top-0 z-30 bg-gray-900/95 backdrop-blur-md border-b border-white/10">
+    <div class="max-w-5xl mx-auto px-3 flex items-center justify-between h-12">
+      <span class="font-bold text-sm text-white/80 hidden sm:block">Hack Ton Esprit</span>
+      <div class="desktop-tabs flex items-center gap-0.5 mx-auto sm:mx-0">
+        <button onclick="showTab('chat')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="chat"><i class="fas fa-comment-dots mr-1.5 text-violet-400"></i>Alma</button>
+        <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="lifeline"><i class="fas fa-road mr-1.5 text-cyan-400"></i>Ligne de vie</button>
+        <button onclick="showTab('psych')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="psych"><i class="fas fa-fingerprint mr-1.5 text-pink-400"></i>Profil Psy</button>
+        <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent rounded-t-lg" data-tab="thoughttree"><i class="fas fa-diagram-project mr-1.5 text-teal-400"></i>Arbre</button>
       </div>
-    </div>
-    <!-- Desktop tabs -->
-    <div class="desktop-tabs max-w-5xl mx-auto px-4 flex gap-1 border-t border-white/5">
-      <button onclick="showTab('chat')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="chat"><i class="fas fa-comments mr-1"></i>Alma</button>
-      <button onclick="showTab('lifeline')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="lifeline"><i class="fas fa-timeline mr-1"></i>Ligne de vie</button>
-      <button onclick="showTab('psych')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="psych"><i class="fas fa-user-doctor mr-1"></i>Profil Psy</button>
-      <button onclick="showTab('thoughttree')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="thoughttree"><i class="fas fa-sitemap mr-1"></i>Arbre</button>
-      <button onclick="showTab('habits')" class="tab-btn px-3 py-2 text-xs text-gray-400 hover:text-white transition-all border-b-2 border-transparent whitespace-nowrap" data-tab="habits"><i class="fas fa-list-check mr-1"></i>Habitudes</button>
+      <button onclick="logout()" class="text-gray-500 hover:text-white text-sm p-1.5 hidden sm:block" title="Deconnexion"><i class="fas fa-right-from-bracket"></i></button>
     </div>
   </nav>
 
@@ -1719,17 +1710,16 @@ function getAppHTML(): string {
 
   <!-- MOBILE BOTTOM NAV -->
   <div class="bottom-nav">
-    <div class="flex justify-around items-center px-1 pt-1">
-      <button onclick="showTab('chat')" class="bottom-nav-btn active" data-tab="chat"><i class="fas fa-comments"></i><span>Alma</span></button>
-      <button onclick="showTab('lifeline')" class="bottom-nav-btn" data-tab="lifeline"><i class="fas fa-timeline"></i><span>Vie</span></button>
-      <button onclick="showTab('psych')" class="bottom-nav-btn" data-tab="psych"><i class="fas fa-user-doctor"></i><span>Profil</span></button>
-      <button onclick="showTab('thoughttree')" class="bottom-nav-btn" data-tab="thoughttree"><i class="fas fa-sitemap"></i><span>Arbre</span></button>
-      <button onclick="showTab('habits')" class="bottom-nav-btn" data-tab="habits"><i class="fas fa-list-check"></i><span>Habitudes</span></button>
+    <div class="flex justify-around items-center px-2 pt-1.5 pb-0.5">
+      <button onclick="showTab('chat')" class="bottom-nav-btn active" data-tab="chat"><i class="fas fa-comment-dots"></i><span>Alma</span></button>
+      <button onclick="showTab('lifeline')" class="bottom-nav-btn" data-tab="lifeline"><i class="fas fa-road"></i><span>Vie</span></button>
+      <button onclick="showTab('psych')" class="bottom-nav-btn" data-tab="psych"><i class="fas fa-fingerprint"></i><span>Profil</span></button>
+      <button onclick="showTab('thoughttree')" class="bottom-nav-btn" data-tab="thoughttree"><i class="fas fa-diagram-project"></i><span>Arbre</span></button>
+      <button onclick="logout()" class="bottom-nav-btn" data-tab="logout"><i class="fas fa-right-from-bracket"></i><span>Sortir</span></button>
     </div>
   </div>
 
-  <!-- CAPTURE FAB -->
-  <button onclick="openCapture()" class="capture-fab flex items-center justify-center text-white text-xl" title="Capture instantanee"><i class="fas fa-bolt"></i></button>
+
 
   <!-- MODALS -->
   <div id="captureModal" class="fixed inset-0 modal-overlay hidden z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -2001,7 +1991,7 @@ function showTab(t){
     if(btn.classList.contains('bottom-nav-btn'))btn.classList.add('active')
   });
   // Hide FAB on chat tab, show elsewhere
-  const fab=document.querySelector('.capture-fab');if(fab){fab.style.display=t==='chat'?'none':'flex'}
+
   // Adjust padding for chat tab (no safe-bottom needed)
   const main=document.getElementById('mainContent');if(main){if(t==='chat'){main.classList.remove('safe-bottom');main.style.paddingBottom='0'}else{main.classList.add('safe-bottom');main.style.paddingBottom=''}}
   if(t==='lifeline')loadLifeline();if(t==='habits')loadHabits();
