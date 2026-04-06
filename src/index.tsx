@@ -1042,15 +1042,15 @@ async function buildChatSystemPrompt(db: D1Database, userId: number, messagesCou
 
   // Determine which data gaps exist
   const gaps: string[] = [];
-  if (lifeEventsCount < 3) gaps.push('LIGNE DE VIE quasi vide — il faut decouvrir les evenements fondateurs (enfance, famille, ruptures, reussites)');
-  else if (lifeEventsCount < 10) gaps.push('LIGNE DE VIE incomplete — creuser les periodes de vie peu documentees');
-  if (traitsCount < 2) gaps.push('PROFIL PSY inexistant — observer les schemas de pensee dans ce que dit l\'utilisateur');
-  else if (traitsCount < 5) gaps.push('PROFIL PSY partial — chercher les contradictions ou angles morts dans les traits identifies');
-  if (thoughtsTotal < 5) gaps.push('ARBRE DES PENSEES vide — categoriser les reflexions partagees');
+  if (lifeEventsCount < 3) gaps.push('LIGNE DE VIE quasi vide : il faut decouvrir les evenements fondateurs (enfance, famille, ruptures, reussites)');
+  else if (lifeEventsCount < 10) gaps.push('LIGNE DE VIE incomplete : creuser les periodes de vie peu documentees');
+  if (traitsCount < 2) gaps.push('PROFIL PSY inexistant : observer les schemas de pensee dans ce que dit l\'utilisateur');
+  else if (traitsCount < 5) gaps.push('PROFIL PSY partial : chercher les contradictions ou angles morts dans les traits identifies');
+  if (thoughtsTotal < 5) gaps.push('ARBRE DES PENSEES vide : categoriser les reflexions partagees');
   const hasNoRelationData = !(lifeEvents.results || []).some((e: any) => ['relation', 'famille', 'amitie'].includes(e.life_domain));
   const hasNoWorkData = !(lifeEvents.results || []).some((e: any) => e.life_domain === 'travail');
-  if (hasNoRelationData) gaps.push('Aucune donnee sur les RELATIONS (famille, amour, amities) — explorer ce domaine');
-  if (hasNoWorkData) gaps.push('Aucune donnee sur le TRAVAIL/CARRIERE — explorer ce domaine');
+  if (hasNoRelationData) gaps.push('Aucune donnee sur les RELATIONS (famille, amour, amities) : explorer ce domaine');
+  if (hasNoWorkData) gaps.push('Aucune donnee sur le TRAVAIL/CARRIERE : explorer ce domaine');
 
   let phaseInstructions = '';
   if (isFirstContact) {
@@ -1117,10 +1117,11 @@ Comprendre l'utilisateur en PROFONDEUR. Pas juste en surface. Tu cherches a :
 TA METHODE :
 1. UNE question a la fois. Jamais de liste de questions.
 2. REFORMULER ce que tu comprends avant de poser la question suivante → ca montre que tu ecoutes et ca permet a l'utilisateur de corriger
-3. CREUSER quand quelque chose est flou : "Attends, tu as dit X — qu'est-ce que tu veux dire exactement ?"
-4. RELIER : "Ca me fait penser a ce que tu m'as dit sur Y — tu vois un lien ?"
+3. CREUSER quand quelque chose est flou : "Attends, tu as dit X, qu'est-ce que tu veux dire exactement ?"
+4. RELIER : "Ca me fait penser a ce que tu m'as dit sur Y, tu vois un lien ?"
 5. CHALLENGER avec douceur : "J'entends que tu penses ca, mais est-ce que c'est vraiment le cas ? Ou est-ce que c'est une histoire que tu te racontes ?"
-6. Tes reponses sont COURTES et PERCUTANTES (3-5 phrases max + 1 question). Pas de pavés.
+6. Tes reponses sont COURTES et PERCUTANTES (3-5 phrases max + 1 question). Pas de paves.
+7. STYLE D'ECRITURE OBLIGATOIRE : ecris comme dans un SMS ou un message WhatsApp. Pas de tirets longs, pas de tirets cadratins, pas de listes a puces, pas de formulations academiques. Utilise des virgules, des points, des retours a la ligne simples. Tu parles comme une vraie personne, pas comme une IA.
 
 ${phaseInstructions}
 
@@ -1130,10 +1131,10 @@ DONNEES ACTUELLES DE L'UTILISATEUR (${user?.display_name || user?.username || 'i
 - Streak: ${user?.current_streak || 0} jours
 
 EVENEMENTS DE VIE CONNUS (${lifeEventsCount}) :
-${lifeEventsCount > 0 ? JSON.stringify((lifeEvents.results || []).slice(0, 20), null, 1) : '[Aucun — tout est a decouvrir]'}
+${lifeEventsCount > 0 ? JSON.stringify((lifeEvents.results || []).slice(0, 20), null, 1) : '[Aucun, tout est a decouvrir]'}
 
 TRAITS PSYCHOLOGIQUES IDENTIFIES (${traitsCount}) :
-${traitsCount > 0 ? JSON.stringify((psychTraits.results || []).map((t: any) => ({ nom: t.trait_name, categorie: t.category, probabilite: t.probability, description: t.description })), null, 1) : '[Aucun — a construire via la conversation]'}
+${traitsCount > 0 ? JSON.stringify((psychTraits.results || []).map((t: any) => ({ nom: t.trait_name, categorie: t.category, probabilite: t.probability, description: t.description })), null, 1) : '[Aucun, a construire via la conversation]'}
 ${profileSummary}
 
 ARBRE DES PENSEES (${thoughtsTotal} pensees categorisees) :
@@ -1149,7 +1150,7 @@ CHECK-INS RECENTS :
 ${(recentCheckins.results || []).length > 0 ? JSON.stringify((recentCheckins.results || []).slice(0, 5).map((c: any) => ({ type: c.type, emotion: c.emotion, detail: c.emotion_detail, emotion_forte: c.strong_emotion })), null, 1) : '[Aucun]'}
 
 LACUNES A COMBLER EN PRIORITE :
-${gaps.length > 0 ? gaps.map((g, i) => (i + 1) + '. ' + g).join('\n') : 'Donnees relativement completes — approfondir et chercher les incoherences.'}
+${gaps.length > 0 ? gaps.map((g, i) => (i + 1) + '. ' + g).join('\n') : 'Donnees relativement completes, approfondir et chercher les incoherences.'}
 
 ACTIONS AUTOMATIQUES (invisibles pour l'utilisateur) :
 Quand l'utilisateur partage des informations significatives, ajoute un bloc JSON APRES ton texte.
@@ -1781,7 +1782,7 @@ function getAllTabsHTML(): string {
 }
 
 function getDashboardTab(): string {
-  return `<div id="tab-dashboard" class="tab-content fade-in">
+  return `<div id="tab-dashboard" class="tab-content hidden fade-in">
   <!-- Header with XP ring -->
   <div class="flex items-center gap-4 mb-6">
     <div class="xp-ring flex-shrink-0"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="3"/><circle id="xpCircle" cx="18" cy="18" r="16" fill="none" stroke="#8b5cf6" stroke-width="3" stroke-dasharray="0 100" stroke-linecap="round"/></svg><div class="xp-ring-text"><span id="globalLevelNum" class="text-sm font-black text-violet-300">1</span><span class="text-[8px] text-gray-500 uppercase">Niveau</span></div></div>
@@ -1903,8 +1904,8 @@ function getChatTab(): string {
         <div class="w-7 h-7 rounded-full bg-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5"><i class="fas fa-brain text-violet-300 text-xs"></i></div>
         <div class="card rounded-xl rounded-tl-sm p-3 max-w-[85%]">
           <p class="text-xs text-gray-300 leading-relaxed">Salut ! Moi c'est <span class="text-violet-300 font-medium">Alma</span>. Je suis ta psy IA dans Hack Ton Esprit.</p>
-          <p class="text-xs text-gray-300 leading-relaxed mt-2">Mon objectif ? Te comprendre en profondeur — tes schemas de pensee, tes reactions, ce qui te bloque, ce qui te fait avancer. Plus on discute, mieux je te connais.</p>
-          <p class="text-xs text-gray-300 leading-relaxed mt-2">Pour commencer, dis-moi : comment tu t'appelles et qu'est-ce qui t'amene ici ?</p>
+          <p class="text-xs text-gray-300 leading-relaxed mt-2">Mon objectif ? Te comprendre en profondeur. Tes schemas de pensee, tes reactions, ce qui te bloque, ce qui te fait avancer. Plus on discute, mieux je te connais.</p>
+          <p class="text-xs text-gray-300 leading-relaxed mt-2">Pour commencer, dis-moi comment tu t'appelles et qu'est-ce qui t'amene ici ?</p>
         </div>
       </div>
     </div>
