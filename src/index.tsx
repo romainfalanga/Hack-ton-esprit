@@ -638,15 +638,25 @@ app.get('/api/psych/profile', async (c) => {
   const db = c.env.DB;
 
   const traits = await db.prepare(
-    'SELECT * FROM psych_profile_traits WHERE user_id = ? AND status = \'active\' ORDER BY probability DESC'
+    "SELECT * FROM psych_profile_traits WHERE user_id = ? AND status = 'active' ORDER BY probability DESC"
   ).bind(user.id).all();
 
   const lastSnapshot = await db.prepare(
     'SELECT * FROM psych_profile_snapshots WHERE user_id = ? ORDER BY generated_at DESC LIMIT 1'
   ).bind(user.id).first() as any;
 
+  const dimensions = await db.prepare(
+    'SELECT * FROM psych_dimensions WHERE user_id = ? ORDER BY framework, confidence DESC'
+  ).bind(user.id).all();
+
+  const coreBeliefs = await db.prepare(
+    "SELECT * FROM core_beliefs WHERE user_id = ? AND status = 'active' ORDER BY strength DESC"
+  ).bind(user.id).all();
+
   return c.json({
     traits: traits.results || [],
+    dimensions: dimensions.results || [],
+    core_beliefs: coreBeliefs.results || [],
     last_snapshot: lastSnapshot ? { ...lastSnapshot, full_profile: JSON.parse(lastSnapshot.full_profile || '{}') } : null,
   });
 });
@@ -1424,18 +1434,52 @@ function selectModel(messagesCount: number, hasDeepContent: boolean): string {
   return 'google/gemini-2.0-flash-001';
 }
 
-// Parse actions from AI response
+// Parse actions from AI response — handles multiple formats the model may use
 function parseActions(response: string): { text: string; actions: any[] } {
-  const actionMatch = response.match(/\|\|\|ACTIONS\|\|\|([\s\S]*?)\|\|\|END_ACTIONS\|\|\|/);
   let text = response;
   let actions: any[] = [];
-  if (actionMatch) {
-    text = response.replace(actionMatch[0], '').trim();
-    try {
-      const parsed = JSON.parse(actionMatch[1]);
-      actions = parsed.actions || [];
-    } catch {}
+
+  // Format 1 (intended): |||ACTIONS|||{json}|||END_ACTIONS|||
+  const fmt1 = response.match(/\|\|\|ACTIONS\|\|\|([\s\S]*?)\|\|\|END_ACTIONS\|\|\|/);
+  if (fmt1) {
+    text = response.replace(fmt1[0], '').trim();
+    try { const p = JSON.parse(fmt1[1]); actions = p.actions || []; } catch {}
+    return { text, actions };
   }
+
+  // Format 2 (model reality): |||ACTIONS|||{json}||| followed by visible text
+  // Model puts actions block at START, then uses ||| as separator
+  const fmt2 = response.match(/^\|\|\|ACTIONS\|\|\|([\s\S]*?)\|\|\|([\s\S]*)$/);
+  if (fmt2) {
+    try {
+      const parsed = JSON.parse(fmt2[1]);
+      actions = parsed.actions || [];
+      text = fmt2[2].trim();
+    } catch {}
+    return { text, actions };
+  }
+
+  // Format 3: |||ACTIONS|||{json}||| at END (no visible text after)
+  const fmt3 = response.match(/^([\s\S]*?)\|\|\|ACTIONS\|\|\|([\s\S]*?)\|\|\|$/);
+  if (fmt3) {
+    text = fmt3[1].trim();
+    try { const p = JSON.parse(fmt3[2]); actions = p.actions || []; } catch {}
+    return { text, actions };
+  }
+
+  // Format 4: fallback — try to find any JSON block with "actions" array anywhere in response
+  const fmt4 = response.match(/\|\|\|ACTIONS\|\|\|([\s\S]*?)(\|\|\||$)/);
+  if (fmt4) {
+    try {
+      const parsed = JSON.parse(fmt4[1]);
+      actions = parsed.actions || [];
+      text = response.replace(fmt4[0], '').replace(/^\|\|\|/, '').trim();
+    } catch {}
+    return { text, actions };
+  }
+
+  // Safety net: strip any remaining ||| markers from visible text
+  text = text.replace(/\|\|\|ACTIONS\|\|\|[\s\S]*?(\|\|\|END_ACTIONS\|\|\||\|\|\||$)/g, '').trim();
   return { text, actions };
 }
 
@@ -2247,12 +2291,10 @@ function getPsychTab(): string {
 
 function getThoughtTreeTab(): string {
   return `<div id="tab-thoughttree" class="tab-content hidden fade-in">
-  <div class="flex items-center justify-between mb-4">
-    <div><h2 class="text-lg font-bold"><i class="fas fa-sitemap text-teal-400 mr-2"></i>Arbre des Pensees</h2><p class="text-xs text-gray-400">Organisation de tes reflexions</p></div>
+  <div class="flex items-center justify-between mb-3">
+    <div><h2 class="text-lg font-bold"><i class="fas fa-brain text-teal-400 mr-2"></i>Arbre des Pensees</h2><p class="text-xs text-gray-400">Tes reflexions organisees par theme</p></div>
   </div>
-  <div id="thoughtBranches" class="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4"></div>
-  <h3 class="font-semibold text-sm mb-2">Pensees recentes</h3>
-  <div id="thoughtEntries" class="space-y-2"><p class="text-gray-500 text-xs">Tes pensees sont classees automatiquement au fil de tes discussions avec Alma.</p></div>
+  <div id="thoughtTreeContent" class="space-y-3"><p class="text-gray-500 text-xs">Tes pensees se classent automatiquement au fil de tes discussions avec Alma.</p></div>
 </div>`;
 }
 
@@ -2538,20 +2580,135 @@ async function sendChatMessage(){
 
 // === PSYCH PROFILE ===
 async function loadPsychProfile(){
-  try{const r=await fetch(API+'/api/psych/profile',{headers:headers()});const d=await r.json();
-  const ts=d.traits||[];const snap=d.last_snapshot;
-  const el=document.getElementById('psychTraits');const sum=document.getElementById('psychSummary');
-  if(snap?.full_profile){sum.classList.remove('hidden');const p=snap.full_profile;
-    sum.innerHTML='<h3 class="font-bold text-pink-300 text-sm mb-2"><i class="fas fa-clipboard-list mr-1"></i>Synthese</h3><p class="text-xs text-gray-300 mb-2">'+(p.global_summary||'')+'</p>'+(p.strengths?'<div class="mb-2"><span class="text-[10px] font-medium text-green-400">Forces:</span><div class="flex flex-wrap gap-1 mt-1">'+p.strengths.map(s=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-green-500/20 text-green-300">'+s+'</span>').join('')+'</div></div>':'')+(p.growth_areas?'<div><span class="text-[10px] font-medium text-amber-400">Axes:</span><div class="flex flex-wrap gap-1 mt-1">'+p.growth_areas.map(g=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300">'+g+'</span>').join('')+'</div></div>':'')+'<div class="text-[9px] text-gray-500 mt-2">'+( snap.data_points_count||0)+' points | '+new Date(snap.generated_at).toLocaleDateString('fr-FR')+'</div>'}
-  else{sum.classList.add('hidden')}
-  if(!ts.length){el.innerHTML='<p class="text-gray-500 text-xs">Aucun profil. Ajoute des donnees puis genere.</p>';return}
-  const cats={attachment:'Attachement',defense:'Defenses',bias:'Biais',emotional_regulation:'Regulation emotionnelle',relational:'Relationnel',identity:'Identite',cognitive:'Cognitif'};
-  const grouped={};ts.forEach(t=>{const c=t.category||'other';if(!grouped[c])grouped[c]=[];grouped[c].push(t)});
-  let h='';for(const[cat,traits]of Object.entries(grouped)){h+='<div class="mb-3"><h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">'+(cats[cat]||cat)+'</h4>';
-    for(const t of traits){const pct=Math.round(t.probability*100);const color=pct>=80?'text-red-400':pct>=60?'text-amber-400':'text-blue-400';
-      const ev=t.evidence?JSON.parse(t.evidence):[];
-      h+='<div class="card rounded-lg p-3 mb-1.5"><div class="flex items-center justify-between mb-1"><span class="font-semibold text-xs">'+t.trait_name+'</span><span class="text-[10px] font-bold '+color+'">'+pct+'%</span></div><p class="text-[10px] text-gray-400 mb-1.5">'+t.description+'</p><div class="stat-bar"><div class="stat-fill '+(pct>=80?'bg-red-500':pct>=60?'bg-amber-500':'bg-blue-500')+'" style="width:'+pct+'%"></div></div>'+(ev.length?'<div class="text-[9px] text-gray-500 mt-1">'+ev.slice(0,2).map(e=>'\\u2022 '+e).join('<br>')+'</div>':'')+'</div>'}h+='</div>'}
-  el.innerHTML=h}catch(e){console.error(e)}}
+  try{
+    const r=await fetch(API+'/api/psych/profile',{headers:headers()});const d=await r.json();
+    const ts=d.traits||[];const snap=d.last_snapshot;const dims=d.dimensions||[];const beliefs=d.core_beliefs||[];
+    const el=document.getElementById('psychTraits');const sum=document.getElementById('psychSummary');
+
+    // --- SECTION 1: Portrait narratif + frameworks ---
+    let portraitHtml='';
+
+    // Derive MBTI type from dimensions
+    const getMBTI=()=>{
+      const ei=dims.find(x=>x.framework==='mbti'&&x.dimension_key==='ei');
+      const sn=dims.find(x=>x.framework==='mbti'&&x.dimension_key==='sn');
+      const tf=dims.find(x=>x.framework==='mbti'&&x.dimension_key==='tf');
+      const jp=dims.find(x=>x.framework==='mbti'&&x.dimension_key==='jp');
+      if(!ei&&!sn&&!tf&&!jp) return null;
+      const l1=ei?(ei.score>0?'E':'I'):'?';
+      const l2=sn?(sn.score>0?'N':'S'):'?';
+      const l3=tf?(tf.score>0?'F':'T'):'?';
+      const l4=jp?(jp.score>0?'P':'J'):'?';
+      return l1+l2+l3+l4;
+    };
+
+    // Derive dominant attachment style
+    const getAttachment=()=>{
+      const styles=dims.filter(x=>x.framework==='attachment');
+      if(!styles.length) return null;
+      const best=styles.reduce((a,b)=>(a.score||0)>(b.score||0)?a:b);
+      const names={secure:'Securise',anxious:'Anxieux',avoidant:'Evitant',disorganized:'Desorganise'};
+      return names[best.dimension_key]||best.dimension_name;
+    };
+
+    // Derive enneagram type
+    const getEnneagram=()=>{
+      const t=dims.find(x=>x.framework==='enneagram'&&x.dimension_key==='type');
+      const w=dims.find(x=>x.framework==='enneagram'&&x.dimension_key==='wing');
+      if(!t) return null;
+      const typeNames={1:'Perfectionniste',2:'Altruiste',3:'Battant',4:'Romantique',5:'Observateur',6:'Loyaliste',7:'Epicurien',8:'Chef',9:'Mediateur'};
+      const type=Math.round(t.score||0);
+      return 'Type '+type+(typeNames[type]?' ('+typeNames[type]+')':'')+(w&&w.score?' aile '+Math.round(w.score):'');
+    };
+
+    // Big Five bars
+    const getBigFive=()=>{
+      const keys=['openness','conscientiousness','extraversion','agreeableness','neuroticism'];
+      const labels={openness:'Ouverture',conscientiousness:'Conscienciosite',extraversion:'Extraversion',agreeableness:'Agreabilite',neuroticism:'Nevrosisme'};
+      const found=keys.map(k=>dims.find(x=>x.framework==='big_five'&&x.dimension_key===k)).filter(Boolean);
+      return found;
+    };
+
+    const mbti=getMBTI();const attachment=getAttachment();const enneagram=getEnneagram();const bigFive=getBigFive();
+    const hasDims=mbti||attachment||enneagram||bigFive.length>0;
+
+    if(hasDims){
+      portraitHtml+='<div class="card rounded-xl p-4 mb-3 border-pink-500/20">';
+      portraitHtml+='<h3 class="font-bold text-pink-300 text-xs mb-3 uppercase tracking-wider">Portrait psychologique</h3>';
+
+      // Type cards row
+      let typeCards='';
+      if(mbti) typeCards+='<div class="card rounded-lg p-2.5 text-center"><div class="text-lg font-black text-violet-300">'+mbti+'</div><div class="text-[9px] text-gray-500 mt-0.5">MBTI</div></div>';
+      if(enneagram) typeCards+='<div class="card rounded-lg p-2.5 text-center"><div class="text-xs font-bold text-amber-300">'+enneagram+'</div><div class="text-[9px] text-gray-500 mt-0.5">Enneagramme</div></div>';
+      if(attachment) typeCards+='<div class="card rounded-lg p-2.5 text-center"><div class="text-xs font-bold text-cyan-300">'+attachment+'</div><div class="text-[9px] text-gray-500 mt-0.5">Attachement</div></div>';
+      if(typeCards) portraitHtml+='<div class="grid grid-cols-3 gap-2 mb-3">'+typeCards+'</div>';
+
+      // Big Five bars
+      if(bigFive.length){
+        portraitHtml+='<div class="space-y-1.5">';
+        const bfColors={openness:'bg-violet-500',conscientiousness:'bg-blue-500',extraversion:'bg-green-500',agreeableness:'bg-teal-500',neuroticism:'bg-red-500'};
+        const bfLabels={openness:'Ouverture',conscientiousness:'Conscience',extraversion:'Extraversion',agreeableness:'Agreabilite',neuroticism:'Nevrosisme'};
+        for(const d of bigFive){
+          const pct=Math.min(100,Math.max(0,Math.round(d.score||50)));
+          const col=bfColors[d.dimension_key]||'bg-violet-500';
+          const lbl=bfLabels[d.dimension_key]||d.dimension_name;
+          portraitHtml+='<div><div class="flex items-center justify-between mb-0.5"><span class="text-[9px] text-gray-400">'+lbl+'</span><span class="text-[9px] text-gray-500">'+pct+'%</span></div><div class="stat-bar h-1.5"><div class="stat-fill h-1.5 '+col+'" style="width:'+pct+'%"></div></div></div>';
+        }
+        portraitHtml+='</div>';
+      }
+
+      // Snapshot personality portrait
+      if(snap?.full_profile?.personality_portrait){
+        portraitHtml+='<p class="text-[10px] text-gray-300 mt-3 leading-relaxed">'+snap.full_profile.personality_portrait+'</p>';
+      }
+      portraitHtml+='</div>';
+    }
+
+    // --- SECTION 2: Core beliefs ---
+    if(beliefs.length){
+      portraitHtml+='<div class="card rounded-xl p-3 mb-3 border-red-500/20">';
+      portraitHtml+='<h3 class="font-bold text-red-300 text-xs mb-2 uppercase tracking-wider">Croyances centrales</h3>';
+      const targetLabels={self:'Sur soi',others:'Sur les autres',world:'Sur le monde',future:'Sur l\'avenir'};
+      const targetColors={self:'text-red-300 bg-red-500/20',others:'text-orange-300 bg-orange-500/20',world:'text-amber-300 bg-amber-500/20',future:'text-purple-300 bg-purple-500/20'};
+      for(const b of beliefs.slice(0,5)){
+        const pct=Math.round((b.strength||0.5)*100);
+        const tc=targetColors[b.target]||'text-gray-300 bg-gray-500/20';
+        const tl=targetLabels[b.target]||b.target;
+        portraitHtml+='<div class="flex items-start gap-2 mb-2"><span class="px-1.5 py-0.5 rounded text-[9px] flex-shrink-0 '+tc+'">'+tl+'</span><div class="flex-1 min-w-0"><p class="text-xs text-gray-300 italic">"'+b.belief_text+'"</p>'+(b.origin_hypothesis?'<p class="text-[9px] text-gray-500 mt-0.5">'+b.origin_hypothesis+'</p>':'')+'</div><span class="text-[9px] text-gray-500 flex-shrink-0">'+pct+'%</span></div>';
+      }
+      portraitHtml+='</div>';
+    }
+
+    // --- SECTION 3: Summary snapshot ---
+    if(snap?.full_profile){
+      sum.classList.remove('hidden');const p=snap.full_profile;
+      sum.innerHTML='<h3 class="font-bold text-pink-300 text-xs mb-2 uppercase tracking-wider">Synthese</h3><p class="text-xs text-gray-300 mb-2">'+(p.global_summary||'')+'</p>'+
+        (p.strengths?.length?'<div class="mb-2"><span class="text-[10px] font-medium text-green-400">Forces :</span><div class="flex flex-wrap gap-1 mt-1">'+p.strengths.map(s=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-green-500/20 text-green-300">'+s+'</span>').join('')+'</div></div>':'')+
+        (p.growth_areas?.length?'<div><span class="text-[10px] font-medium text-amber-400">Axes de travail :</span><div class="flex flex-wrap gap-1 mt-1">'+p.growth_areas.map(g=>'<span class="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300">'+g+'</span>').join('')+'</div></div>':'')+
+        '<div class="text-[9px] text-gray-500 mt-2">'+(snap.data_points_count||0)+' points | '+new Date(snap.generated_at).toLocaleDateString('fr-FR')+'</div>';
+    } else { sum.classList.add('hidden'); }
+
+    // --- SECTION 4: Traits grouped by category ---
+    let traitsHtml='';
+    if(ts.length){
+      const cats={attachment:'Attachement',defense:'Mecanismes de defense',bias:'Biais cognitifs',emotional_regulation:'Regulation emotionnelle',relational:'Relationnel',identity:'Identite',cognitive:'Cognitif'};
+      const grouped={};ts.forEach(t=>{const c=t.category||'other';if(!grouped[c])grouped[c]=[];grouped[c].push(t)});
+      traitsHtml+='<h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Traits observes</h4>';
+      for(const[cat,traits] of Object.entries(grouped) as any){
+        traitsHtml+='<div class="mb-3"><div class="text-[9px] font-bold text-gray-600 uppercase mb-1">'+(cats[cat]||cat)+'</div>';
+        for(const t of traits as any[]){const pct=Math.round(t.probability*100);const color=pct>=80?'text-red-400':pct>=60?'text-amber-400':'text-blue-400';const bar=pct>=80?'bg-red-500':pct>=60?'bg-amber-500':'bg-blue-500';
+          const ev=t.evidence?JSON.parse(t.evidence):[];
+          traitsHtml+='<div class="card rounded-lg p-3 mb-1.5"><div class="flex items-center justify-between mb-1"><span class="font-semibold text-xs">'+t.trait_name+'</span><span class="text-[10px] font-bold '+color+'">'+pct+'%</span></div><p class="text-[10px] text-gray-400 mb-1.5">'+t.description+'</p><div class="stat-bar"><div class="stat-fill '+bar+'" style="width:'+pct+'%"></div></div>'+(ev.length?'<div class="text-[9px] text-gray-500 mt-1">'+ev.slice(0,2).map(e=>'\u2022 '+e).join('<br>')+'</div>':'')+'</div>';
+        }
+        traitsHtml+='</div>';
+      }
+    } else if(!hasDims&&!beliefs.length){
+      traitsHtml='<p class="text-gray-500 text-xs">Ton profil se construit automatiquement au fil de tes discussions avec Alma.</p>';
+    }
+
+    el.innerHTML=portraitHtml+traitsHtml;
+  }catch(e){console.error(e)}
+}
 
 async function generatePsychProfile(){
   const btn=document.getElementById('generatePsychBtn');btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin mr-1"></i>...';
@@ -2561,14 +2718,74 @@ async function generatePsychProfile(){
 
 // === THOUGHT TREE ===
 async function loadThoughtTree(){
-  try{const r=await fetch(API+'/api/thought/tree',{headers:headers()});const d=await r.json();
-  const bEl=document.getElementById('thoughtBranches');const eEl=document.getElementById('thoughtEntries');
-  const branches=d.branches||[];const entries=d.entries||[];
-  if(branches.length){bEl.innerHTML=branches.map(b=>{const w=Math.min(100,Math.round((b.thought_count||0)*5));
-    return '<div class="card rounded-lg p-3"><div class="flex items-center justify-between mb-1"><h3 class="font-semibold text-xs truncate">'+b.branch_name+'</h3><span class="text-[9px] text-gray-500">'+b.thought_count+'</span></div><p class="text-[9px] text-gray-400 mb-1 line-clamp-1">'+b.description+'</p><div class="stat-bar"><div class="stat-fill bg-teal-500" style="width:'+w+'%"></div></div></div>'}).join('')}
-  else{bEl.innerHTML='<p class="text-gray-500 text-xs col-span-3">Branches auto-creees.</p>'}
-  if(entries.length){eEl.innerHTML=entries.slice(0,15).map(e=>'<div class="card rounded-lg p-3"><p class="text-xs mb-1">'+e.content+'</p><div class="flex items-center gap-1.5 text-[9px] text-gray-500"><span>'+e.source_type+'</span>'+(e.branch_names?'<span>| '+e.branch_names+'</span>':'')+'</div></div>').join('')}
-  else{eEl.innerHTML='<p class="text-gray-500 text-xs">Aucune pensee categorisee.</p>'}}catch(e){console.error(e)}}
+  try{
+    const r=await fetch(API+'/api/thought/tree',{headers:headers()});const d=await r.json();
+    const el=document.getElementById('thoughtTreeContent');
+    const branches=d.branches||[];const entries=d.entries||[];
+
+    if(!branches.length){el.innerHTML='<p class="text-gray-500 text-xs">Tes pensees se classent automatiquement au fil de tes discussions avec Alma.</p>';return;}
+
+    // Group entries by branch
+    const entriesByBranch={};
+    for(const e of entries){
+      const bNames=(e.branch_names||'').split(',');
+      for(const bn of bNames){
+        const key=bn.trim();
+        if(!key) continue;
+        if(!entriesByBranch[key]) entriesByBranch[key]=[];
+        entriesByBranch[key].push(e);
+      }
+    }
+
+    // Branch icons
+    const branchIcons={Soi:'fa-user',Relations:'fa-heart',Travail:'fa-briefcase',Sante:'fa-heartbeat',Argent:'fa-coins',Sens:'fa-star',Passe:'fa-clock-rotate-left',Futur:'fa-rocket',Quotidien:'fa-sun'};
+    const branchColors={Soi:'text-violet-400 bg-violet-500/10 border-violet-500/20',Relations:'text-pink-400 bg-pink-500/10 border-pink-500/20',Travail:'text-blue-400 bg-blue-500/10 border-blue-500/20',Sante:'text-green-400 bg-green-500/10 border-green-500/20',Argent:'text-amber-400 bg-amber-500/10 border-amber-500/20',Sens:'text-purple-400 bg-purple-500/10 border-purple-500/20',Passe:'text-orange-400 bg-orange-500/10 border-orange-500/20',Futur:'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',Quotidien:'text-teal-400 bg-teal-500/10 border-teal-500/20'};
+
+    // Render: only branches that have thoughts, sorted by thought_count desc
+    const activeBranches=branches.filter(b=>b.thought_count>0).sort((a,b)=>(b.thought_count||0)-(a.thought_count||0));
+    const emptyBranches=branches.filter(b=>!b.thought_count);
+
+    let html='';
+
+    if(activeBranches.length){
+      for(const b of activeBranches){
+        const col=branchColors[b.branch_name]||'text-gray-400 bg-gray-500/10 border-gray-500/20';
+        const icon=branchIcons[b.branch_name]||'fa-circle-dot';
+        const bEntries=(entriesByBranch[b.branch_name]||[]).slice(0,3);
+        html+='<div class="card rounded-xl border '+col+' overflow-hidden">';
+        html+='<div class="flex items-center gap-2 p-3 pb-2"><div class="w-7 h-7 rounded-lg flex items-center justify-center '+col+'"><i class="fas '+icon+' text-xs"></i></div>';
+        html+='<div class="flex-1"><h3 class="font-bold text-sm">'+b.branch_name+'</h3><p class="text-[9px] text-gray-500">'+b.description+'</p></div>';
+        html+='<span class="text-[10px] font-bold text-gray-400">'+b.thought_count+' pensee'+(b.thought_count>1?'s':'')+'</span></div>';
+
+        if(bEntries.length){
+          html+='<div class="px-3 pb-3 space-y-2 border-t border-white/5 pt-2">';
+          for(const e of bEntries){
+            html+='<div class="bg-black/20 rounded-lg p-2"><p class="text-[11px] text-gray-300 leading-relaxed">"'+e.content+'"</p>';
+            html+='<p class="text-[9px] text-gray-600 mt-1">'+new Date(e.created_at).toLocaleDateString('fr-FR')+'</p></div>';
+          }
+          if(b.thought_count>3){html+='<p class="text-[9px] text-gray-500 text-center mt-1">+ '+(b.thought_count-3)+' autres pensees</p>';}
+          html+='</div>';
+        } else {
+          html+='<div class="px-3 pb-3"><p class="text-[10px] text-gray-600 italic">Aucune pensee chargee pour ce theme.</p></div>';
+        }
+        html+='</div>';
+      }
+    }
+
+    // Show empty branches as small pills at the bottom
+    if(emptyBranches.length){
+      html+='<div class="mt-2"><p class="text-[9px] text-gray-600 mb-1.5 uppercase tracking-wider">Themes non explores</p>';
+      html+='<div class="flex flex-wrap gap-1.5">';
+      for(const b of emptyBranches){
+        const col=branchColors[b.branch_name]||'text-gray-400 bg-gray-500/10';
+        html+='<span class="px-2 py-1 rounded-full text-[10px] '+col+' border opacity-40">'+b.branch_name+'</span>';
+      }
+      html+='</div></div>';
+    }
+
+    el.innerHTML=html;
+  }catch(e){console.error(e)}
+}
 
 async function categorizeThoughts(){
   showToast('\\u{1FA84}','Categorisation...');
