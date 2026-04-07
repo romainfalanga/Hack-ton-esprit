@@ -2668,7 +2668,7 @@ async function loadPsychProfile(){
     if(beliefs.length){
       portraitHtml+='<div class="card rounded-xl p-3 mb-3 border-red-500/20">';
       portraitHtml+='<h3 class="font-bold text-red-300 text-xs mb-2 uppercase tracking-wider">Croyances centrales</h3>';
-      const targetLabels={self:'Sur soi',others:'Sur les autres',world:'Sur le monde',future:'Sur l\'avenir'};
+      const targetLabels={self:'Sur soi',others:'Sur les autres',world:'Sur le monde',future:'Sur l\\'avenir'};
       const targetColors={self:'text-red-300 bg-red-500/20',others:'text-orange-300 bg-orange-500/20',world:'text-amber-300 bg-amber-500/20',future:'text-purple-300 bg-purple-500/20'};
       for(const b of beliefs.slice(0,5)){
         const pct=Math.round((b.strength||0.5)*100);
