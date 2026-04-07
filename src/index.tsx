@@ -665,6 +665,9 @@ app.post('/api/psych/generate', async (c) => {
   const decontaminations = await db.prepare('SELECT * FROM decontaminations WHERE user_id = ? ORDER BY created_at DESC LIMIT 10').bind(user.id).all();
   const patterns = await db.prepare('SELECT * FROM patterns WHERE user_id = ?').bind(user.id).all();
   const existingTraits = await db.prepare('SELECT * FROM psych_profile_traits WHERE user_id = ?').bind(user.id).all();
+  const existingDimensions = await db.prepare('SELECT * FROM psych_dimensions WHERE user_id = ?').bind(user.id).all();
+  const existingBeliefs = await db.prepare("SELECT * FROM core_beliefs WHERE user_id = ? AND status = 'active'").bind(user.id).all();
+  const chatMessages = await db.prepare("SELECT role, content FROM chat_messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 40").bind(user.id).all();
 
   // Fetch emotions for life events
   const eventsWithEmotions = [];
@@ -673,11 +676,11 @@ app.post('/api/psych/generate', async (c) => {
     eventsWithEmotions.push({ ...evt, emotions: emos.results });
   }
 
-  const prompt = `Tu es un psychologue clinicien specialise en TCC et psychologie de la personnalite.
-Analyse les donnees ci-dessous pour generer un profil psychologique detaille.
+  const prompt = `Tu es un psychologue clinicien expert en psychologie de la personnalite, psychodynamique, TCC et schemas de Young.
+Analyse TOUTES les donnees ci-dessous pour generer un profil psychologique COMPLET et STRUCTURE.
 
 EVENEMENTS DE VIE (Ligne de vie) :
-${JSON.stringify(eventsWithEmotions.slice(-20), null, 2)}
+${JSON.stringify(eventsWithEmotions.slice(-25), null, 2)}
 
 CHECK-INS RECENTS :
 ${JSON.stringify((checkins.results || []).slice(-20), null, 2)}
@@ -688,11 +691,20 @@ ${JSON.stringify((captures.results || []).slice(-20), null, 2)}
 DECONTAMINATIONS :
 ${JSON.stringify((decontaminations.results || []).slice(-5), null, 2)}
 
+EXTRAITS DE CONVERSATIONS AVEC ALMA (les plus recents) :
+${JSON.stringify((chatMessages.results || []).slice(-20).map((m: any) => ({ role: m.role, content: m.content?.substring(0, 200) })), null, 2)}
+
 PATTERNS DETECTES :
 ${JSON.stringify(patterns.results || [], null, 2)}
 
 TRAITS DEJA IDENTIFIES :
-${JSON.stringify((existingTraits.results || []).map((t: any) => ({ key: t.trait_key, name: t.trait_name, probability: t.probability })), null, 2)}
+${JSON.stringify((existingTraits.results || []).map((t: any) => ({ key: t.trait_key, name: t.trait_name, probability: t.probability, category: t.category })), null, 2)}
+
+DIMENSIONS DEJA EVALUEES :
+${JSON.stringify((existingDimensions.results || []).map((d: any) => ({ framework: d.framework, key: d.dimension_key, score: d.score, confidence: d.confidence })), null, 2)}
+
+CROYANCES CENTRALES DETECTEES :
+${JSON.stringify((existingBeliefs.results || []).map((b: any) => ({ key: b.belief_key, text: b.belief_text, target: b.target, strength: b.strength })), null, 2)}
 
 Reponds UNIQUEMENT en JSON avec ce format :
 {
@@ -703,25 +715,65 @@ Reponds UNIQUEMENT en JSON avec ce format :
       "trait_name": "Nom en francais",
       "description": "Description detaillee du trait (2-3 phrases)",
       "probability": 0.85,
-      "evidence": ["preuve 1 basee sur les donnees", "preuve 2"],
+      "evidence": ["preuve 1", "preuve 2"],
       "counter_evidence": ["element contraire si present"]
     }
   ],
-  "global_summary": "Resume global du profil (3-5 phrases)",
-  "key_dynamics": ["dynamique 1", "dynamique 2"],
+  "dimensions": [
+    {
+      "framework": "big_five|mbti|enneagram|attachment|young_schemas|defense_mechanisms|values",
+      "dimension_key": "cle (ex: openness, ei, abandonment, denial, autonomy...)",
+      "dimension_name": "Nom lisible",
+      "score": nombre (0-100 pour Big Five/attachment/Young/values/defense, -100 a 100 pour MBTI, 1-9 pour enneagram type),
+      "confidence": 0.0-1.0,
+      "description": "Justification detaillee",
+      "evidence": ["indice 1", "indice 2"]
+    }
+  ],
+  "core_beliefs": [
+    {
+      "belief_key": "snake_case",
+      "belief_text": "La croyance formulee (ex: 'Je ne suis pas digne d amour')",
+      "target": "self|others|world|future",
+      "valence": "positive|negative|mixed",
+      "strength": 0.0-1.0,
+      "origin_hypothesis": "Hypothese sur l origine de cette croyance",
+      "evidence": ["ce qui le confirme"]
+    }
+  ],
+  "global_summary": "Resume global du profil psychologique (5-8 phrases, style portrait narratif)",
+  "personality_portrait": "Portrait de personnalite en langage naturel incluant : type MBTI probable, type enneagramme probable, style d'attachement dominant, schemas de Young actifs, mecanismes de defense principaux, valeurs centrales (3-5 phrases)",
+  "key_dynamics": ["dynamique psychologique 1", "dynamique 2", "dynamique 3"],
   "growth_areas": ["axe de developpement 1", "axe 2"],
-  "strengths": ["force 1", "force 2"]
+  "strengths": ["force psychologique 1", "force 2"],
+  "event_links": [
+    {
+      "event_a_title": "titre exact d'un evenement",
+      "event_b_title": "titre exact d'un autre evenement",
+      "link_type": "cause|consequence|repetition|mirror|rupture|compensation|trigger|evolution",
+      "description": "explication du lien"
+    }
+  ]
 }
 
-Pour chaque trait, la probability (0-1) represente ta certitude. Plus il y a de donnees coherentes, plus c'est eleve.
-IMPORTANT: Mets a jour les traits existants si les donnees le justifient (probabilite en hausse ou baisse).`;
+INSTRUCTIONS IMPORTANTES :
+- Evalue TOUTES les dimensions Big Five (openness, conscientiousness, extraversion, agreeableness, neuroticism)
+- Evalue les 4 dimensions MBTI (ei, sn, tf, jp)
+- Identifie le type enneagramme probable (type + aile)
+- Evalue les 4 styles d'attachement (secure, anxious, avoidant, disorganized) — le total doit refleter la dominance
+- Identifie les schemas de Young actifs (au moins les 3-4 plus probables)
+- Identifie les mecanismes de defense les plus utilises (au moins 2-3)
+- Identifie les valeurs fondamentales dominantes (au moins 3)
+- Detecte les croyances centrales sur soi, les autres, le monde et l'avenir
+- Relie les evenements entre eux quand des liens causaux sont evidents
+- Mets a jour les traits et dimensions existants si les donnees le justifient`;
 
   try {
     const response = await callAI(apiKey, {
       messages: [{ role: 'user', content: prompt }],
-      model: 'google/gemini-2.5-flash-preview-05-20',
+      model: 'google/gemini-2.5-flash',
       temperature: 0.3,
-      max_tokens: 4000,
+      max_tokens: 8000,
     });
 
     const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -736,12 +788,9 @@ IMPORTANT: Mets a jour les traits existants si les donnees le justifient (probab
       ).bind(user.id, trait.trait_key).first() as any;
 
       if (existing) {
-        // Log history
         await db.prepare(
           'INSERT INTO psych_profile_history (user_id, trait_id, old_probability, new_probability, old_description, new_description, trigger_source) VALUES (?, ?, ?, ?, NULL, ?, ?)'
         ).bind(user.id, existing.id, existing.probability, trait.probability, trait.description, 'profile_generation').run();
-
-        // Update
         await db.prepare(
           'UPDATE psych_profile_traits SET description = ?, probability = ?, evidence = ?, counter_evidence = ?, last_updated_at = CURRENT_TIMESTAMP, update_count = update_count + 1 WHERE id = ?'
         ).bind(trait.description, trait.probability, JSON.stringify(trait.evidence || []), JSON.stringify(trait.counter_evidence || []), existing.id).run();
@@ -752,11 +801,59 @@ IMPORTANT: Mets a jour les traits existants si les donnees le justifient (probab
       }
     }
 
+    // Update/Insert dimensions
+    for (const dim of (profile.dimensions || [])) {
+      const existing = await db.prepare(
+        'SELECT id, score, confidence FROM psych_dimensions WHERE user_id = ? AND framework = ? AND dimension_key = ?'
+      ).bind(user.id, dim.framework, dim.dimension_key).first() as any;
+
+      if (existing) {
+        await db.prepare(
+          'UPDATE psych_dimensions SET score = ?, confidence = ?, description = ?, evidence = ?, last_updated_at = CURRENT_TIMESTAMP, update_count = update_count + 1 WHERE id = ?'
+        ).bind(dim.score, dim.confidence, dim.description, JSON.stringify(dim.evidence || []), existing.id).run();
+      } else {
+        await db.prepare(
+          'INSERT INTO psych_dimensions (user_id, framework, dimension_key, dimension_name, score, confidence, description, evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(user.id, dim.framework, dim.dimension_key, dim.dimension_name || dim.dimension_key, dim.score, dim.confidence, dim.description, JSON.stringify(dim.evidence || [])).run();
+      }
+    }
+
+    // Update/Insert core beliefs
+    for (const belief of (profile.core_beliefs || [])) {
+      const existing = await db.prepare(
+        'SELECT id, strength FROM core_beliefs WHERE user_id = ? AND belief_key = ?'
+      ).bind(user.id, belief.belief_key).first() as any;
+
+      if (existing) {
+        await db.prepare(
+          'UPDATE core_beliefs SET belief_text = ?, strength = ?, origin_hypothesis = ?, evidence = ?, last_updated_at = CURRENT_TIMESTAMP, update_count = update_count + 1 WHERE id = ?'
+        ).bind(belief.belief_text, belief.strength, belief.origin_hypothesis || null, JSON.stringify(belief.evidence || []), existing.id).run();
+      } else {
+        await db.prepare(
+          'INSERT INTO core_beliefs (user_id, belief_key, belief_text, target, valence, strength, origin_hypothesis, evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        ).bind(user.id, belief.belief_key, belief.belief_text, belief.target || 'self', belief.valence || 'negative', belief.strength || 0.5, belief.origin_hypothesis || null, JSON.stringify(belief.evidence || [])).run();
+      }
+    }
+
+    // Create event links
+    for (const link of (profile.event_links || [])) {
+      const eventA = await db.prepare('SELECT id FROM life_events WHERE user_id = ? AND title = ?').bind(user.id, link.event_a_title).first() as any;
+      const eventB = await db.prepare('SELECT id FROM life_events WHERE user_id = ? AND title = ?').bind(user.id, link.event_b_title).first() as any;
+      if (eventA && eventB) {
+        const existingLink = await db.prepare('SELECT id FROM life_event_links WHERE user_id = ? AND event_a_id = ? AND event_b_id = ?')
+          .bind(user.id, eventA.id, eventB.id).first();
+        if (!existingLink) {
+          await db.prepare('INSERT INTO life_event_links (user_id, event_a_id, event_b_id, link_type, description, detected_by) VALUES (?, ?, ?, ?, ?, ?)')
+            .bind(user.id, eventA.id, eventB.id, link.link_type || 'cause', link.description || null, 'profile_generation').run();
+        }
+      }
+    }
+
     // Save snapshot
-    const dataPointsCount = (lifeEvents.results?.length || 0) + (checkins.results?.length || 0) + (captures.results?.length || 0);
+    const dataPointsCount = (lifeEvents.results?.length || 0) + (checkins.results?.length || 0) + (captures.results?.length || 0) + (chatMessages.results?.length || 0);
     await db.prepare(
       'INSERT INTO psych_profile_snapshots (user_id, full_profile, model_used, data_points_count) VALUES (?, ?, ?, ?)'
-    ).bind(user.id, JSON.stringify(profile), 'google/gemini-2.5-flash-preview-05-20', dataPointsCount).run();
+    ).bind(user.id, JSON.stringify(profile), 'google/gemini-2.5-flash', dataPointsCount).run();
 
     // Award XP
     const xp = await awardXP(db, user.id, { lucidity: 15, resonance: 5 }, 'psych_profile', 0, 'Profil psychologique mis a jour');
@@ -1014,7 +1111,7 @@ app.delete('/api/habits/:id', async (c) => {
 async function buildChatSystemPrompt(db: D1Database, userId: number, messagesCount: number): Promise<string> {
   const user = await db.prepare('SELECT display_name, username, created_at, current_streak, longest_streak FROM users WHERE id = ?').bind(userId).first() as any;
   const stats = await db.prepare('SELECT * FROM user_stats WHERE user_id = ?').bind(userId).first() as any;
-  const lifeEvents = await db.prepare('SELECT title, description, age_at_event, global_intensity, valence, life_domain FROM life_events WHERE user_id = ? ORDER BY age_at_event ASC LIMIT 30').bind(userId).all();
+  const lifeEvents = await db.prepare('SELECT id, title, description, age_at_event, global_intensity, valence, life_domain FROM life_events WHERE user_id = ? ORDER BY age_at_event ASC LIMIT 30').bind(userId).all();
   const psychTraits = await db.prepare("SELECT trait_name, category, description, probability FROM psych_profile_traits WHERE user_id = ? AND status = 'active' ORDER BY probability DESC LIMIT 15").bind(userId).all();
   const lastSnapshot = await db.prepare('SELECT full_profile FROM psych_profile_snapshots WHERE user_id = ? ORDER BY generated_at DESC LIMIT 1').bind(userId).first() as any;
   const thoughtBranches = await db.prepare('SELECT branch_name, thought_count, dominant_emotion FROM thought_branches WHERE user_id = ? ORDER BY weight DESC LIMIT 9').bind(userId).all();
@@ -1023,6 +1120,10 @@ async function buildChatSystemPrompt(db: D1Database, userId: number, messagesCou
   const patterns = await db.prepare("SELECT pattern_name, confidence, status, evidence FROM patterns WHERE user_id = ? AND status IN ('detected','active') ORDER BY confidence DESC").bind(userId).all();
   const totalConversations = await db.prepare('SELECT COUNT(*) as count FROM conversations WHERE user_id = ?').bind(userId).first() as any;
   const totalMessages = await db.prepare('SELECT COUNT(*) as count FROM chat_messages WHERE user_id = ?').bind(userId).first() as any;
+  // New: fetch structured psych dimensions, core beliefs, event links
+  const psychDimensions = await db.prepare('SELECT framework, dimension_key, dimension_name, score, confidence, description FROM psych_dimensions WHERE user_id = ? ORDER BY framework, confidence DESC').bind(userId).all();
+  const coreBeliefs = await db.prepare("SELECT belief_key, belief_text, target, valence, strength, origin_hypothesis FROM core_beliefs WHERE user_id = ? AND status = 'active' ORDER BY strength DESC LIMIT 15").bind(userId).all();
+  const eventLinks = await db.prepare('SELECT el.link_type, el.description, el.strength, ea.title as event_a_title, eb.title as event_b_title FROM life_event_links el JOIN life_events ea ON el.event_a_id = ea.id JOIN life_events eb ON el.event_b_id = eb.id WHERE el.user_id = ? ORDER BY el.created_at DESC LIMIT 20').bind(userId).all();
 
   let profileSummary = '';
   if (lastSnapshot?.full_profile) {
@@ -1035,6 +1136,9 @@ async function buildChatSystemPrompt(db: D1Database, userId: number, messagesCou
   const lifeEventsCount = (lifeEvents.results || []).length;
   const traitsCount = (psychTraits.results || []).length;
   const thoughtsTotal = (thoughtBranches.results || []).reduce((sum: number, b: any) => sum + (b.thought_count || 0), 0);
+  const dimensionsCount = (psychDimensions.results || []).length;
+  const beliefsCount = (coreBeliefs.results || []).length;
+  const linksCount = (eventLinks.results || []).length;
   const isFirstContact = (totalMessages?.count || 0) <= 2;
   const isEarlyPhase = lifeEventsCount < 5 && traitsCount < 3;
   const isMidPhase = lifeEventsCount >= 5 && lifeEventsCount < 15;
@@ -1051,16 +1155,26 @@ async function buildChatSystemPrompt(db: D1Database, userId: number, messagesCou
   const hasNoWorkData = !(lifeEvents.results || []).some((e: any) => e.life_domain === 'travail');
   if (hasNoRelationData) gaps.push('Aucune donnee sur les RELATIONS (famille, amour, amities) : explorer ce domaine');
   if (hasNoWorkData) gaps.push('Aucune donnee sur le TRAVAIL/CARRIERE : explorer ce domaine');
+  // New: gaps for structured frameworks
+  const dimsByFramework = (psychDimensions.results || []).reduce((acc: any, d: any) => { acc[d.framework] = (acc[d.framework] || 0) + 1; return acc; }, {});
+  if (!dimsByFramework['big_five']) gaps.push('BIG FIVE inconnu : observer ouverture, conscienciosite, extraversion, agreabilite, nevrosisme');
+  if (!dimsByFramework['attachment']) gaps.push('STYLE D ATTACHEMENT inconnu : explorer ses relations intimes, sa reaction a la separation, son besoin de proximite');
+  if (!dimsByFramework['enneagram']) gaps.push('ENNEAGRAMME inconnu : comprendre sa motivation profonde et sa peur fondamentale');
+  if (!dimsByFramework['young_schemas']) gaps.push('SCHEMAS DE YOUNG non explores : chercher les schemas precoces inadaptes (abandon, carence, imperfection...)');
+  if (!dimsByFramework['defense_mechanisms']) gaps.push('MECANISMES DE DEFENSE non identifies : observer comment il gere les situations menacantes');
+  if (!dimsByFramework['values']) gaps.push('VALEURS FONDAMENTALES inconnues : decouvrir ce qui motive et guide ses choix de vie');
+  if (beliefsCount < 2) gaps.push('CROYANCES CENTRALES non detectees : identifier ses convictions profondes sur lui-meme, les autres et le monde');
+  if (linksCount < 3 && lifeEventsCount >= 3) gaps.push('LIENS ENTRE EVENEMENTS absents : relier les evenements entre eux (causes, consequences, repetitions, echoes)');
 
   let phaseInstructions = '';
   if (isFirstContact) {
     phaseInstructions = `
 PHASE ACTUELLE : PREMIER CONTACT
-C'est la toute premiere interaction avec cet utilisateur. Ton objectif :
-1. Te presenter chaleureusement : tu es Alma, tu expliques brievement que tu es la pour l'aider a mieux se comprendre
-2. Demander son PRENOM (pas le pseudo) et comment il/elle prefere etre appele(e)
-3. Demander son AGE approximatif
-4. Demander ce qui l'amene ici, ce qu'il/elle cherche a comprendre sur lui/elle-meme
+C'est la toute premiere interaction. Ton objectif :
+1. Te presenter chaleureusement. Explique QUI tu es et COMMENT tu fonctionnes :
+   "Salut, moi c'est Alma. Je suis ta psy IA. Mon but c'est de te connaitre en profondeur pour t'aider a mieux te comprendre. Au fil de nos echanges, je construis trois choses : ta ligne de vie (les evenements qui t'ont marque), ton profil psychologique (comment tu fonctionnes) et ton arbre des pensees (tes croyances profondes). Plus on parle, plus je te connais, et mieux je peux t'aider."
+2. Demander son PRENOM et son AGE approximatif
+3. Demander ce qui l'amene ici
 NE PAS tout demander d'un coup. Commence par te presenter et poser UNE question.`;
   } else if (isEarlyPhase) {
     phaseInstructions = `
@@ -1069,19 +1183,25 @@ L'utilisateur est nouveau. Tu as peu de matiere. Ton fil conducteur :
 1. Si tu ne connais pas encore son contexte de base (age, situation familiale, situation pro) → le decouvrir naturellement
 2. Explorer les 3-4 EVENEMENTS FONDATEURS de sa vie (enfance, adolescence, vie adulte) : moments de rupture, traumatismes, grandes joies, pertes
 3. Pour CHAQUE evenement partage, creuser : "Qu'est-ce que tu as ressenti a ce moment-la ?" / "Comment ca a change ta facon de voir les choses ?"
-4. Commencer a detecter les PREMIERS SCHEMAS : est-ce que tu remarques un pattern dans ses reactions ? Une tendance a eviter ? A contrôler ? A se sacrifier ?
+4. Commencer a detecter les PREMIERS SCHEMAS : est-ce que tu remarques un pattern dans ses reactions ?
+5. EVALUER les premieres dimensions Big Five : est-il plutot introverti ou extraverti ? Organise ou spontane ? Emotif ou stable ?
+6. IDENTIFIER le style d'attachement naissant : comment reagit-il quand on parle de ses relations proches ?
 
-STRATEGIE DE QUESTIONS : pose des questions ouvertes qui invitent a raconter ("Raconte-moi...", "Qu'est-ce qui s'est passe quand..."). Quand il repond, REFORMULE ce que tu comprends et pose LA question suivante la plus pertinente pour combler un trou dans ta comprehension.`;
+STRATEGIE DE QUESTIONS : pose des questions ouvertes qui invitent a raconter ("Raconte-moi...", "Qu'est-ce qui s'est passe quand..."). Quand il repond, REFORMULE ce que tu comprends et pose LA question suivante la plus pertinente pour combler un trou dans ta comprehension.
+IMPORTANT : chaque reponse doit enrichir au moins une dimension psychologique (Big Five, attachement, valeurs, croyances).`;
   } else if (isMidPhase) {
     phaseInstructions = `
 PHASE ACTUELLE : APPROFONDISSEMENT (donnees en construction)
 Tu commences a connaitre l'utilisateur. Maintenant :
-1. IDENTIFIER LES INCOHERENCES : quand il dit une chose mais que ses evenements de vie suggerent autre chose, pointe-le delicatement ("Tu dis que X ne t'affecte plus, mais j'ai l'impression que...")
-2. EXPLORER LES ANGLES MORTS : les domaines de vie non documentes, les emotions jamais exprimees, les relations jamais mentionnees
+1. IDENTIFIER LES INCOHERENCES : quand il dit une chose mais que ses evenements de vie suggerent autre chose, pointe-le delicatement
+2. EXPLORER LES ANGLES MORTS : les domaines de vie non documentes, les emotions jamais exprimees
 3. RELIER LES POINTS : "Est-ce que tu vois un lien entre [evenement A] et ta tendance a [comportement B] ?"
-4. Proposer des HYPOTHESES sur ses mecanismes de defense et demander validation
+4. APPROFONDIR LES FRAMEWORKS : poser des questions qui affinent les scores Big Five, le style d'attachement, l'enneagramme
+5. DETECTER LES SCHEMAS DE YOUNG : chercher les schemas precoces inadaptes (abandon, carence, imperfection, echec, assujettissement...)
+6. IDENTIFIER LES CROYANCES CENTRALES : "au fond, qu'est-ce que tu crois sur toi-meme ? sur les autres ? sur le monde ?"
+7. RELIER LES EVENEMENTS : quand un nouvel evenement rappelle un ancien, creer le lien (cause, consequence, repetition, miroir)
 
-DONNEES MANQUANTES A COMBLER : 
+DONNEES MANQUANTES A COMBLER :
 ${gaps.join('\n')}`;
   } else {
     phaseInstructions = `
@@ -1089,13 +1209,25 @@ PHASE ACTUELLE : ANALYSE PROFONDE (profil riche)
 Tu as beaucoup de matiere. Maintenant :
 1. DETECTER LES FAILLES DE COHERENCE : contradictions entre ce qu'il dit, ce qu'il ressent, et ce qu'il fait
 2. QUESTIONNER LES MECANISMES : "Pourquoi tu reagis comme ca dans cette situation precises ?" → chercher la racine
-3. FAIRE DES LIENS TRANSVERSAUX entre evenements de vie, traits psychologiques et patterns
-4. CHALLENGER (avec bienveillance) ses croyances limitantes
-5. Aider a FORMULER des prises de conscience
+3. FAIRE DES LIENS TRANSVERSAUX entre evenements de vie, dimensions psychologiques, croyances et patterns
+4. CHALLENGER (avec bienveillance) ses croyances centrales limitantes
+5. AFFINER les profils : preciser les scores MBTI, valider les hypotheses d'enneagramme, ajuster les schemas de Young
+6. CARTOGRAPHIER les mecanismes de defense : lesquels il utilise, dans quelles situations, depuis quand
+7. PROPOSER DES PRISES DE CONSCIENCE : relier un schema de Young a un evenement fondateur et a un comportement actuel
 
 HYPOTHESES A EXPLORER :
 ${gaps.join('\n')}`;
   }
+
+  // Build dimensions summary grouped by framework
+  const dimsGrouped: Record<string, any[]> = {};
+  for (const d of (psychDimensions.results || []) as any[]) {
+    if (!dimsGrouped[d.framework]) dimsGrouped[d.framework] = [];
+    dimsGrouped[d.framework].push({ dim: d.dimension_name, score: d.score, conf: d.confidence, desc: d.description });
+  }
+  const dimensionsSummary = dimensionsCount > 0
+    ? Object.entries(dimsGrouped).map(([fw, dims]) => `  ${fw}: ${JSON.stringify(dims)}`).join('\n')
+    : '[VIDE]';
 
   return `Tu es Alma, psychologue clinicienne virtuelle. App "Hack Ton Esprit".
 
@@ -1105,17 +1237,28 @@ Tu t'appelles Alma. Tu tutoies. Tu es chaleureuse, directe, perspicace. Tu parle
 STYLE D'ECRITURE STRICT :
 Ecris comme sur WhatsApp. Phrases courtes. Pas de tirets longs. Pas de listes a puces. Pas de mise en forme speciale. Pas de gras, pas d'italique, pas de markdown. Virgules et points, c'est tout. Maximum 3 a 5 phrases + 1 question. Jamais de pave.
 
-OBJECTIF PRINCIPAL :
-Comprendre cet utilisateur en profondeur pour remplir trois bases de donnees qui construisent son portrait psychologique :
+TON FONCTIONNEMENT (a expliquer a l'utilisateur au premier contact) :
+Tu construis progressivement 5 couches de connaissance sur l'utilisateur :
+1. LIGNE DE VIE : ses evenements marquants, relies entre eux par des liens de cause, consequence, repetition, miroir
+2. PROFIL PSYCHOLOGIQUE STRUCTURE : Big Five (OCEAN), MBTI indicatif, enneagramme, style d'attachement, schemas de Young, mecanismes de defense, valeurs fondamentales
+3. ARBRE DES PENSEES : ses reflexions profondes classees par theme
+4. CROYANCES CENTRALES : ses convictions profondes sur lui-meme, les autres, le monde et l'avenir
+5. PATTERNS ET LIENS : les connexions entre tous ces elements, pour comprendre POURQUOI il fonctionne comme il fonctionne
 
-1. LIGNE DE VIE : les evenements marquants de sa vie, classes par age et domaine. Tu veux reconstituer sa chronologie complete : enfance, ado, vie adulte. Les ruptures, les joies, les deuils, les rencontres, les echecs, les reussites.
-
-2. PROFIL PSYCHOLOGIQUE : ses traits de personnalite, schemas de pensee, mecanismes de defense, biais cognitifs, style d'attachement, regulation emotionnelle. Tu observes COMMENT il pense, pas juste CE qu'il dit.
-
-3. ARBRE DES PENSEES : ses reflexions profondes, croyances, certitudes, doutes. Classes par theme (soi, relations, travail, sante, argent, sens de la vie, passe, futur, quotidien).
+Plus il te parle, plus tu le connais, plus tu deviens pertinente. Chaque message nourrit ce systeme.
 
 TA METHODE :
 UNE question a la fois. Tu reformules ce que tu comprends, puis tu poses LA question qui creuse le plus. Quand quelque chose est flou tu insistes. Quand tu detectes une incoherence tu la pointes avec douceur. Tu relies les points entre eux.
+
+APPROCHE PSYCHOLOGIQUE :
+Tu ne poses pas des questions au hasard. Tu as des GRILLES DE LECTURE precises :
+- Big Five : tu observes s'il est plutot ouvert/ferme, organise/spontane, extraverti/introverti, cooperatif/competitif, stable/emotif
+- Attachement : tu ecoutes comment il parle de ses relations proches, ses reactions a la separation, au rejet, a l'intimite
+- Enneagramme : tu cherches sa motivation profonde (perfection ? amour ? reussite ? authenticite ? savoir ? securite ? liberte ? pouvoir ? paix ?)
+- Schemas de Young : tu detectes les schemas precoces inadaptes qui se repetent (abandon, carence, imperfection, echec, assujettissement, sacrifice...)
+- Mecanismes de defense : tu observes COMMENT il gere les menaces psychologiques (deni, projection, rationalisation, deplacement, intellectualisation...)
+- Valeurs : tu identifies ce qui motive ses choix (autonomie, securite, accomplissement, bienveillance, stimulation, conformite...)
+- Croyances centrales : tu cherches les convictions profondes ("je suis nul", "les gens sont egoistes", "le monde est dangereux", "rien ne changera")
 
 ${phaseInstructions}
 
@@ -1125,9 +1268,18 @@ Stats : Niveau ${stats?.global_level || 1}/10, ${stats?.total_xp || 0} XP, strea
 LIGNE DE VIE (${lifeEventsCount} evenements) :
 ${lifeEventsCount > 0 ? JSON.stringify((lifeEvents.results || []).slice(0, 20), null, 1) : '[VIDE]'}
 
-PROFIL PSY (${traitsCount} traits) :
+LIENS ENTRE EVENEMENTS (${linksCount} liens) :
+${linksCount > 0 ? JSON.stringify((eventLinks.results || []).map((l: any) => ({ de: l.event_a_title, vers: l.event_b_title, type: l.link_type, desc: l.description })), null, 1) : '[VIDE]'}
+
+DIMENSIONS PSYCHOLOGIQUES (${dimensionsCount} dimensions) :
+${dimensionsSummary}
+
+PROFIL PSY TRAITS (${traitsCount} traits) :
 ${traitsCount > 0 ? JSON.stringify((psychTraits.results || []).map((t: any) => ({ nom: t.trait_name, cat: t.category, prob: t.probability, desc: t.description })), null, 1) : '[VIDE]'}
 ${profileSummary}
+
+CROYANCES CENTRALES (${beliefsCount} croyances) :
+${beliefsCount > 0 ? JSON.stringify((coreBeliefs.results || []).map((b: any) => ({ croyance: b.belief_text, cible: b.target, valence: b.valence, force: b.strength, origine: b.origin_hypothesis })), null, 1) : '[VIDE]'}
 
 ARBRE DES PENSEES (${thoughtsTotal} pensees) :
 ${JSON.stringify((thoughtBranches.results || []).map((b: any) => ({ branche: b.branch_name, nb: b.thought_count, emotion: b.dominant_emotion })), null, 1)}
@@ -1146,51 +1298,39 @@ ${gaps.length > 0 ? gaps.map((g, i) => (i + 1) + '. ' + g).join('\n') : 'Profil 
 A CHAQUE REPONSE ou presque, tu DOIS generer des actions quand l'utilisateur partage des informations. C'est ta fonction principale : nourrir les bases de donnees.
 
 QUAND GENERER DES ACTIONS :
-- L'utilisateur mentionne un evenement de sa vie (meme brievement) → add_life_event
-- L'utilisateur exprime une croyance, une reflexion, un doute, une certitude → add_thought  
+- L'utilisateur mentionne un evenement de sa vie → add_life_event
+- L'utilisateur exprime une croyance, une reflexion, un doute → add_thought
 - Tu detectes un schema de pensee, un mecanisme, un biais, un trait → suggest_trait
-- L'utilisateur parle de son enfance, sa famille, son travail, une relation → add_life_event
-- L'utilisateur dit "je suis comme ca", "j'ai toujours eu tendance a", "ca m'enerve quand" → suggest_trait + add_thought
-- L'utilisateur raconte une situation avec des emotions → add_life_event avec emotions
-
-QUAND MODIFIER UN TRAIT EXISTANT :
-- Quand un nouvel element confirme ou nuance un trait deja detecte, re-genere suggest_trait avec le meme trait_key. Le systeme ajustera automatiquement la probabilite.
-- Si de nouvelles preuves emergent, mets-les dans "evidence".
+- Tu peux evaluer une dimension psychologique (Big Five, attachement, enneagramme, Young, defense, valeur) → update_dimension
+- L'utilisateur exprime une conviction profonde sur lui/les autres/le monde → add_core_belief
+- Un evenement rappelle un autre evenement deja en base → link_events
+- Un trait/croyance/pattern est clairement lie a un evenement ou une pensee → add_psych_link
 
 FORMAT : ajoute un bloc JSON INVISIBLE apres ton texte (l'utilisateur ne le voit pas).
 |||ACTIONS|||{"actions": [...]}|||END_ACTIONS|||
 
 TYPES D'ACTIONS :
 
-add_life_event : {
+1. add_life_event : {
   "type": "add_life_event",
   "title": "titre court et clair",
   "description": "description detaillee avec le contexte emotionnel",
-  "age_at_event": nombre (age approximatif, demande si pas clair),
-  "global_intensity": 1-10 (impact sur sa vie),
+  "age_at_event": nombre,
+  "global_intensity": 1-10,
   "valence": "positive" | "negative" | "mixed",
   "life_domain": "famille" | "relation" | "travail" | "sante" | "argent" | "amitie" | "education" | "identite" | "perte" | "reussite" | "traumatisme" | "quotidien",
-  "emotions": [{"emotion": "mot", "intensity": 1-10}]
+  "emotions": [{"emotion": "mot", "intensity": 1-10}],
+  "linked_to_event_title": "titre d'un evenement existant si lien evident (optionnel)",
+  "link_type": "cause" | "consequence" | "repetition" | "mirror" | "rupture" | "compensation" | "trigger" | "evolution" (optionnel)
 }
-Exemples de quand l'utiliser :
-- "mes parents ont divorce quand j'avais 10 ans" → add_life_event, domaine famille, age 10
-- "j'ai eu mon premier job a 22 ans" → add_life_event, domaine travail, age 22
-- "ma meilleure amie m'a trahie" → add_life_event, domaine amitie
-- "j'ai rate mon bac" → add_life_event, domaine education
-- "je me suis marie en 2015" → add_life_event, domaine relation
 
-add_thought : {
+2. add_thought : {
   "type": "add_thought",
   "content": "la pensee reformulee clairement",
   "branches": ["soi", "relations", "travail", "sante", "argent", "sens", "passe", "futur", "quotidien"]
 }
-Exemples de quand l'utiliser :
-- "je pense que les gens sont fondamentalement egoistes" → pensee branche "relations" + "sens"
-- "j'ai peur de ne jamais etre a la hauteur" → pensee branche "soi"
-- "l'argent c'est la liberte" → pensee branche "argent" + "sens"
-- "je ne sais pas ce que je veux faire de ma vie" → pensee branche "futur" + "soi"
 
-suggest_trait : {
+3. suggest_trait : {
   "type": "suggest_trait",
   "category": "attachment" | "defense" | "bias" | "emotional_regulation" | "relational" | "identity" | "cognitive",
   "trait_key": "snake_case_unique",
@@ -1199,17 +1339,79 @@ suggest_trait : {
   "probability": 0.0-1.0,
   "evidence": ["citation ou observation 1", "citation ou observation 2"]
 }
+
+4. update_dimension : {
+  "type": "update_dimension",
+  "framework": "big_five" | "mbti" | "enneagram" | "attachment" | "young_schemas" | "defense_mechanisms" | "values",
+  "dimension_key": "la cle de la dimension (ex: openness, anxious, abandonment, denial, autonomy...)",
+  "score": nombre (0-100 pour Big Five/attachement/Young/valeurs, 1-9 pour enneagramme, -100 a 100 pour MBTI),
+  "confidence": 0.0-1.0 (ta certitude sur ce score),
+  "description": "explication de pourquoi tu evalues ainsi, avec les indices observes",
+  "evidence": ["indice 1", "indice 2"]
+}
 Exemples :
-- Quand l'utilisateur dit qu'il fuit les conflits → "conflict_avoidance", categorie "defense", prob 0.4
-- Quand il dit qu'il s'inquiete toujours pour les autres → "hyper_responsability", categorie "relational", prob 0.5
-- Quand il minimise ses emotions → "emotional_minimization", categorie "emotional_regulation", prob 0.4
-- Quand il generalise a partir d'un cas → "overgeneralization", categorie "bias", prob 0.3
+- Il parle beaucoup, est energise par les interactions → big_five / extraversion / score 75 / conf 0.4
+- Il a peur que sa copine le quitte, verifie constamment → attachment / anxious / score 70 / conf 0.5
+- Il cherche toujours la perfection, se critique → young_schemas / unrelenting_standards / score 65 / conf 0.4
+- Il justifie tout par la logique, evite les emotions → defense_mechanisms / intellectualization / score 60 / conf 0.5
+- Il valorise sa liberte par-dessus tout → values / autonomy / score 85 / conf 0.6
+
+MBTI : pour les 4 dimensions, utilise un score de -100 a 100 :
+- ei : -100 = tres introverti, 100 = tres extraverti
+- sn : -100 = tres sensation, 100 = tres intuition
+- tf : -100 = tres pensee, 100 = tres sentiment
+- jp : -100 = tres jugement, 100 = tres perception
+
+5. add_core_belief : {
+  "type": "add_core_belief",
+  "belief_key": "snake_case_unique",
+  "belief_text": "la croyance formulee clairement (ex: 'Je ne merite pas d etre aime')",
+  "target": "self" | "others" | "world" | "future",
+  "valence": "positive" | "negative" | "mixed",
+  "strength": 0.0-1.0,
+  "origin_hypothesis": "hypothese sur l'origine (ex: 'Probablement lie au divorce des parents a 8 ans')",
+  "evidence": ["ce qui confirme cette croyance dans ses propos"]
+}
+Exemples :
+- "je suis nul" → target self, valence negative
+- "les gens sont egoistes" → target others, valence negative
+- "je peux compter sur ma famille" → target others, valence positive
+- "ca va forcement mal finir" → target future, valence negative
+
+6. link_events : {
+  "type": "link_events",
+  "event_a_title": "titre exact de l'evenement A (doit exister dans la ligne de vie)",
+  "event_b_title": "titre exact de l'evenement B (doit exister dans la ligne de vie)",
+  "link_type": "cause" | "consequence" | "repetition" | "mirror" | "rupture" | "compensation" | "trigger" | "evolution",
+  "description": "explication du lien",
+  "strength": 0.0-1.0
+}
+Exemples de liens :
+- "Divorce des parents" → "Difficulte a s'engager en couple" : type repetition, "Le schema d'instabilite relationnelle se reproduit"
+- "Harcelement scolaire" → "Evitement des conflits au travail" : type consequence, "L'experience de harcelement a cree une peur du conflit"
+- "Premier emploi reussi" → "Lancement d'entreprise" : type evolution, "La confiance acquise a mene a plus d'ambition"
+
+7. add_psych_link : {
+  "type": "add_psych_link",
+  "source_type": "trait" | "event" | "thought" | "belief" | "pattern" | "dimension",
+  "source_label": "nom/titre de la source (pour la retrouver)",
+  "target_type": "trait" | "event" | "thought" | "belief" | "pattern" | "dimension",
+  "target_label": "nom/titre de la cible",
+  "link_nature": "causes" | "reinforces" | "contradicts" | "originates_from" | "manifests_as" | "compensates" | "triggers",
+  "confidence": 0.0-1.0
+}
+Exemples :
+- source: belief "Je ne merite pas d etre aime" → target: trait "Evitement de l intimite" : nature "causes"
+- source: event "Abandon du pere" → target: dimension "attachment/anxious" : nature "originates_from"
+- source: trait "Perfectionnisme" → target: dimension "young_schemas/unrelenting_standards" : nature "manifests_as"
 
 REGLES :
-- Genere au minimum 1 action par reponse quand il y a de la matiere (c'est-a-dire presque toujours sauf pour les "bonjour" et "ca va")
-- Genere plusieurs actions si le message est riche (un evenement + une pensee + un trait par exemple)
-- Pour les traits, commence a 0.3-0.5 et le systeme augmentera avec la repetition
+- Genere au minimum 1-2 actions par reponse quand il y a de la matiere
+- Genere BEAUCOUP d'actions si le message est riche (un evenement + une pensee + un trait + une dimension + un lien)
+- Pour les traits et dimensions, commence avec une confidence basse (0.3-0.5) qui augmentera avec la repetition
 - Mets des descriptions DETAILLEES, pas generiques
+- RELIE les elements entre eux autant que possible via link_events et add_psych_link
+- Quand tu ajoutes un life_event, verifie si un lien avec un evenement existant est pertinent
 - NE MENTIONNE JAMAIS les actions dans ton texte visible. L'utilisateur ne doit pas savoir que tu nourris ces bases.`;
 }
 
@@ -1255,6 +1457,15 @@ async function executeActions(db: D1Database, userId: number, actions: any[]): P
             await db.prepare('INSERT INTO life_event_emotions (event_id, emotion, intensity) VALUES (?, ?, ?)').bind(eventId, emo.emotion, emo.intensity || 5).run();
           }
         }
+        // Auto-link to existing event if specified
+        if (action.linked_to_event_title && action.link_type) {
+          const linkedEvent = await db.prepare('SELECT id FROM life_events WHERE user_id = ? AND title = ?').bind(userId, action.linked_to_event_title).first() as any;
+          if (linkedEvent) {
+            await db.prepare('INSERT INTO life_event_links (user_id, event_a_id, event_b_id, link_type, description, strength, detected_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+              .bind(userId, linkedEvent.id, eventId, action.link_type, action.description || null, 0.5, 'alma').run();
+            results.push('event_linked:' + action.linked_to_event_title + '->' + action.title);
+          }
+        }
         await awardXP(db, userId, { lucidity: 5, resonance: 3 }, 'chatbot_life_event', eventId as number, 'Ligne de vie (via Alma): ' + action.title);
         results.push('life_event:' + action.title);
       }
@@ -1285,11 +1496,105 @@ async function executeActions(db: D1Database, userId: number, actions: any[]): P
           results.push('trait_new:' + action.trait_name);
         }
       }
+      // === NEW ACTION: update_dimension ===
+      else if (action.type === 'update_dimension' && action.framework && action.dimension_key) {
+        const existing = await db.prepare('SELECT id, score, confidence FROM psych_dimensions WHERE user_id = ? AND framework = ? AND dimension_key = ?')
+          .bind(userId, action.framework, action.dimension_key).first() as any;
+        if (existing) {
+          // Weighted average: higher confidence new data has more weight
+          const newConf = Math.min(1, (existing.confidence + (action.confidence || 0.3)) / 2 + 0.05);
+          const weight = (action.confidence || 0.3) / ((existing.confidence || 0.1) + (action.confidence || 0.3));
+          const newScore = existing.score !== null ? existing.score * (1 - weight) + (action.score || 50) * weight : (action.score || 50);
+          await db.prepare('UPDATE psych_dimensions SET score = ?, confidence = ?, description = ?, evidence = ?, last_updated_at = CURRENT_TIMESTAMP, update_count = update_count + 1 WHERE id = ?')
+            .bind(Math.round(newScore * 10) / 10, newConf, action.description || '', JSON.stringify(action.evidence || []), existing.id).run();
+          results.push('dimension_updated:' + action.framework + '/' + action.dimension_key);
+        } else {
+          // Get dimension name from framework definitions
+          const dimName = action.dimension_name || action.dimension_key;
+          await db.prepare('INSERT INTO psych_dimensions (user_id, framework, dimension_key, dimension_name, score, confidence, description, evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            .bind(userId, action.framework, action.dimension_key, dimName, action.score || 50, action.confidence || 0.3, action.description || '', JSON.stringify(action.evidence || [])).run();
+          results.push('dimension_new:' + action.framework + '/' + action.dimension_key);
+        }
+      }
+      // === NEW ACTION: add_core_belief ===
+      else if (action.type === 'add_core_belief' && action.belief_key && action.belief_text) {
+        const existing = await db.prepare('SELECT id, strength FROM core_beliefs WHERE user_id = ? AND belief_key = ?')
+          .bind(userId, action.belief_key).first() as any;
+        if (existing) {
+          const newStrength = Math.min(1, Math.max(0, (existing.strength + (action.strength || 0.5)) / 2 + 0.05));
+          await db.prepare('UPDATE core_beliefs SET belief_text = ?, strength = ?, origin_hypothesis = COALESCE(?, origin_hypothesis), evidence = ?, last_updated_at = CURRENT_TIMESTAMP, update_count = update_count + 1 WHERE id = ?')
+            .bind(action.belief_text, newStrength, action.origin_hypothesis || null, JSON.stringify(action.evidence || []), existing.id).run();
+          results.push('belief_updated:' + action.belief_key);
+        } else {
+          await db.prepare('INSERT INTO core_beliefs (user_id, belief_key, belief_text, target, valence, strength, origin_hypothesis, evidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            .bind(userId, action.belief_key, action.belief_text, action.target || 'self', action.valence || 'negative', action.strength || 0.5, action.origin_hypothesis || null, JSON.stringify(action.evidence || [])).run();
+          results.push('belief_new:' + action.belief_key);
+        }
+      }
+      // === NEW ACTION: link_events ===
+      else if (action.type === 'link_events' && action.event_a_title && action.event_b_title) {
+        const eventA = await db.prepare('SELECT id FROM life_events WHERE user_id = ? AND title = ?').bind(userId, action.event_a_title).first() as any;
+        const eventB = await db.prepare('SELECT id FROM life_events WHERE user_id = ? AND title = ?').bind(userId, action.event_b_title).first() as any;
+        if (eventA && eventB) {
+          // Check no duplicate link
+          const existingLink = await db.prepare('SELECT id FROM life_event_links WHERE user_id = ? AND event_a_id = ? AND event_b_id = ?')
+            .bind(userId, eventA.id, eventB.id).first();
+          if (!existingLink) {
+            await db.prepare('INSERT INTO life_event_links (user_id, event_a_id, event_b_id, link_type, description, strength, detected_by) VALUES (?, ?, ?, ?, ?, ?, ?)')
+              .bind(userId, eventA.id, eventB.id, action.link_type || 'cause', action.description || null, action.strength || 0.5, 'alma').run();
+            results.push('events_linked:' + action.event_a_title + '->' + action.event_b_title);
+          }
+        }
+      }
+      // === NEW ACTION: add_psych_link ===
+      else if (action.type === 'add_psych_link' && action.source_type && action.target_type) {
+        // Resolve source and target IDs from labels
+        const sourceId = await resolvePsychLinkId(db, userId, action.source_type, action.source_label);
+        const targetId = await resolvePsychLinkId(db, userId, action.target_type, action.target_label);
+        if (sourceId && targetId) {
+          const existingLink = await db.prepare('SELECT id FROM psych_links WHERE user_id = ? AND source_type = ? AND source_id = ? AND target_type = ? AND target_id = ?')
+            .bind(userId, action.source_type, sourceId, action.target_type, targetId).first();
+          if (!existingLink) {
+            await db.prepare('INSERT INTO psych_links (user_id, source_type, source_id, target_type, target_id, link_nature, confidence) VALUES (?, ?, ?, ?, ?, ?, ?)')
+              .bind(userId, action.source_type, sourceId, action.target_type, targetId, action.link_nature || 'causes', action.confidence || 0.5).run();
+            results.push('psych_link:' + action.source_type + '->' + action.target_type);
+          }
+        }
+      }
     } catch (e) {
       results.push('error:' + action.type);
     }
   }
   return results;
+}
+
+// Helper: resolve a label to an ID for psych_links
+async function resolvePsychLinkId(db: D1Database, userId: number, type: string, label: string): Promise<number | null> {
+  if (!label) return null;
+  try {
+    let row: any = null;
+    switch (type) {
+      case 'trait':
+        row = await db.prepare('SELECT id FROM psych_profile_traits WHERE user_id = ? AND (trait_name = ? OR trait_key = ?)').bind(userId, label, label).first();
+        break;
+      case 'event':
+        row = await db.prepare('SELECT id FROM life_events WHERE user_id = ? AND title = ?').bind(userId, label).first();
+        break;
+      case 'thought':
+        row = await db.prepare('SELECT id FROM thought_entries WHERE user_id = ? AND content LIKE ? ORDER BY created_at DESC LIMIT 1').bind(userId, '%' + label.substring(0, 30) + '%').first();
+        break;
+      case 'belief':
+        row = await db.prepare('SELECT id FROM core_beliefs WHERE user_id = ? AND (belief_key = ? OR belief_text LIKE ?)').bind(userId, label, '%' + label.substring(0, 30) + '%').first();
+        break;
+      case 'pattern':
+        row = await db.prepare('SELECT id FROM patterns WHERE user_id = ? AND (pattern_name = ? OR pattern_key = ?)').bind(userId, label, label).first();
+        break;
+      case 'dimension':
+        row = await db.prepare('SELECT id FROM psych_dimensions WHERE user_id = ? AND (dimension_key = ? OR dimension_name = ?)').bind(userId, label, label).first();
+        break;
+    }
+    return row?.id || null;
+  } catch { return null; }
 }
 
 // Get or create active conversation
