@@ -2694,9 +2694,9 @@ async function loadPsychProfile(){
       const cats={attachment:'Attachement',defense:'Mecanismes de defense',bias:'Biais cognitifs',emotional_regulation:'Regulation emotionnelle',relational:'Relationnel',identity:'Identite',cognitive:'Cognitif'};
       const grouped={};ts.forEach(t=>{const c=t.category||'other';if(!grouped[c])grouped[c]=[];grouped[c].push(t)});
       traitsHtml+='<h4 class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Traits observes</h4>';
-      for(const[cat,traits] of Object.entries(grouped) as any){
+      for(const[cat,traits] of Object.entries(grouped)){
         traitsHtml+='<div class="mb-3"><div class="text-[9px] font-bold text-gray-600 uppercase mb-1">'+(cats[cat]||cat)+'</div>';
-        for(const t of traits as any[]){const pct=Math.round(t.probability*100);const color=pct>=80?'text-red-400':pct>=60?'text-amber-400':'text-blue-400';const bar=pct>=80?'bg-red-500':pct>=60?'bg-amber-500':'bg-blue-500';
+        for(const t of traits){const pct=Math.round(t.probability*100);const color=pct>=80?'text-red-400':pct>=60?'text-amber-400':'text-blue-400';const bar=pct>=80?'bg-red-500':pct>=60?'bg-amber-500':'bg-blue-500';
           const ev=t.evidence?JSON.parse(t.evidence):[];
           traitsHtml+='<div class="card rounded-lg p-3 mb-1.5"><div class="flex items-center justify-between mb-1"><span class="font-semibold text-xs">'+t.trait_name+'</span><span class="text-[10px] font-bold '+color+'">'+pct+'%</span></div><p class="text-[10px] text-gray-400 mb-1.5">'+t.description+'</p><div class="stat-bar"><div class="stat-fill '+bar+'" style="width:'+pct+'%"></div></div>'+(ev.length?'<div class="text-[9px] text-gray-500 mt-1">'+ev.slice(0,2).map(e=>'\u2022 '+e).join('<br>')+'</div>':'')+'</div>';
         }
